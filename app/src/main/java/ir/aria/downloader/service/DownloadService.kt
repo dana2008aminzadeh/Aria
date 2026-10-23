@@ -485,11 +485,8 @@ class DownloadService : Service() {
         updateProgressNotification(force = true)
     }
 
-    private fun buildFileName(title: String, ext: String): String {
-        val cleanTitle = FileNames.sanitize(title, "media")
-        val name = if (FileNames.extensionOf(cleanTitle).isEmpty()) "$cleanTitle.$ext" else cleanTitle
-        return FileNames.sanitize(name, "media.$ext")
-    }
+    private fun buildFileName(title: String, ext: String): String =
+        FileNames.withExtension(title, ext)
 
     private fun finishMedia(
         id: Long,

@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ir.aria.downloader.BuildConfig
 import ir.aria.downloader.R
 import ir.aria.downloader.data.DownloadRepository
@@ -156,6 +157,7 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.versionText.text = getString(R.string.version_format, BuildConfig.VERSION_NAME)
         binding.storageInfo.text = getString(R.string.storage_free, Formats.bytes(freeStorage()))
+        binding.licensesButton.setOnClickListener { showOpenSourceLicenses() }
 
         refreshCookiesStatus()
         loadEngineInfo()
@@ -213,6 +215,24 @@ class SettingsActivity : AppCompatActivity() {
                 append(getString(R.string.engine_ytdlp)).append(" ").append(info.ytDlp)
                 append(" • ").append(getString(R.string.engine_python)).append(" ").append(info.python)
             }
+        }
+    }
+
+    private fun showOpenSourceLicenses() {
+        lifecycleScope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    listOf("FFMPEGKIT-THIRD-PARTY-NOTICES.txt", "FFMPEGKIT-LGPL-3.0.txt")
+                        .joinToString("\n\n") { name ->
+                            assets.open(name).bufferedReader().use { it.readText() }
+                        }
+                }.getOrDefault("FFmpegKit: https://github.com/ffmpegkit-maintained/ffmpeg")
+            }
+            MaterialAlertDialogBuilder(this@SettingsActivity)
+                .setTitle(R.string.open_source_licenses)
+                .setMessage(text)
+                .setPositiveButton(R.string.close, null)
+                .show()
         }
     }
 

@@ -366,6 +366,13 @@
                         android:textSize="12sp"
                         tools:text="yt-dlp 2026.10.21 • Python 3.13" />
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/licensesButton"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/open_source_licenses" />
+
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

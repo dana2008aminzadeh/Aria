@@ -103,6 +103,7 @@
     <string name="engine_ytdlp">yt-dlp</string>
     <string name="engine_python">Python</string>
     <string name="engine_missing">در دسترس نیست</string>
+    <string name="open_source_licenses">مجوزهای متن‌باز و FFmpeg</string>
     <string name="cookies_title">کوکی (cookies.txt)</string>
     <string name="cookies_desc">برای محتوای نیازمند ورود مانند اینستاگرام یا ویدیوهای محدود، فایل cookies.txt را که از مرورگر گرفته‌اید وارد کنید.</string>
     <string name="cookies_import">وارد کردن cookies.txt</string>

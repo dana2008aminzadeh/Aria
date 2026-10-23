@@ -94,6 +94,20 @@ object FileNames {
         return name.substring(dot + 1).lowercase()
     }
 
+    /** Forces the real output extension, including when a media title ends in .mp4/.m4a. */
+    fun withExtension(title: String, extension: String): String {
+        val mediaExtensions = setOf(
+            "mp4", "m4v", "mkv", "webm", "avi", "mov", "flv", "ts", "3gp",
+            "mp3", "m4a", "aac", "opus", "ogg", "wav", "flac", "amr"
+        )
+        val ext = extension.lowercase().removePrefix(".").ifBlank { "bin" }
+        val cleanTitle = sanitize(title, "media")
+        val stem = if (extensionOf(cleanTitle) in mediaExtensions) {
+            cleanTitle.substringBeforeLast('.')
+        } else cleanTitle
+        return sanitize("$stem.$ext", "media.$ext")
+    }
+
     /** Adds " (1)", " (2)" ... before the extension until the name is free. */
     fun ensureUnique(name: String, taken: Set<String>): String {
         val safe = sanitize(name)

@@ -65,11 +65,13 @@ class FormatOptionsTest {
     fun spotifyModeDoesNotChooseProgressiveVideoWhenAudioExists() {
         val choices = FormatOptions.choices(listOf(
             video("18", "mp4", "avc1", 360, progressive = true),
+            audio("251", "webm", "opus", 160.0),
             audio("140", "m4a", "mp4a.40.2", 129.0)
         ), audioOnly = true)
 
-        assertEquals(listOf("140"), choices.map { it.format.id })
-        assertTrue(FormatOptions.outputs(choices.single(), audioOnly = true)
+        assertEquals(listOf("140", "251"), choices.map { it.format.id })
+        assertFalse(choices.any { it.format.progressive })
+        assertTrue(FormatOptions.outputs(choices.first(), audioOnly = true)
             .all { it.kind == "audio" })
     }
 

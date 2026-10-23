@@ -51,7 +51,16 @@ object FormatOptions {
         val usable = if (audioOnly) {
             // Spotify/search should stay audio-only and must not download video merely
             // because a progressive row sorts above the actual audio tracks.
-            if (audioRows.isNotEmpty()) audioRows else formats.filter { it.hasAudio }
+            if (audioRows.isNotEmpty()) {
+                // Preserve the legacy Spotify/default preference (AAC/M4A first), while
+                // retaining every Opus/other track as an explicit user choice.
+                audioRows.sortedWith(
+                    compareByDescending<ExtractorEngine.FormatRow> {
+                        it.ext == "m4a" || it.acodec?.startsWith("mp4a") == true ||
+                            it.acodec?.startsWith("aac") == true
+                    }.thenByDescending { it.abr ?: it.tbr ?: 0.0 }
+                )
+            } else formats.filter { it.hasAudio }
         } else {
             formats
         }
