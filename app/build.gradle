@@ -12,6 +12,11 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
 
+// Robolectric's local dependency resolver requires this directory to exist on a clean
+// machine. Keep downloaded Android runtime jars outside the repository on every OS.
+def robolectricDependencyDir = new File(System.getProperty('java.io.tmpdir'), 'aria-robolectric-deps')
+robolectricDependencyDir.mkdirs()
+
 android {
     namespace 'ir.aria.downloader'
     compileSdk 33
@@ -74,7 +79,7 @@ android {
                 maxHeapSize = "640m"
                 // Robolectric downloads ~100 MB of android-all jars. Keep them OUTSIDE the
                 // project so they are never part of the app/source tree or its snapshots.
-                systemProperty "robolectric.dependency.dir", "/tmp/robolectric-deps"
+                systemProperty "robolectric.dependency.dir", robolectricDependencyDir.absolutePath
                 systemProperty "robolectric.logging.enabled", "false"
             }
         }
