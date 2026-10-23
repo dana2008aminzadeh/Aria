@@ -182,6 +182,102 @@ class LinkIngestorTest {
     }
 
     @Test
+    fun interactiveSelectionIsStoredWithExactOutput() = runBlocking {
+        val url = "https://www.youtube.com/watch?v=choose"
+        val formats = listOf(
+            ExtractorEngine.FormatRow("1080", "mp4", 1080, null, 1000, false, true, ""),
+            ExtractorEngine.FormatRow("720", "mp4", 720, null, 800, false, true, "")
+        )
+        val engine = FakeEngine(probes = mapOf(url to ExtractorEngine.Probe(
+            ok = true, title = "Choose Me", formats = formats, extractor = "Youtube"
+        )))
+        val selection = ExtractorEngine.FormatSelection(
+            formatId = "720", outputExt = "mkv", outputKind = "video", label = "720p • MKV"
+        )
+        val report = LinkIngestor(engine).ingest(
+            listOf(url), preset = "best", chooser = { request ->
+                assertFalse(request.audioOnly)
+                assertEquals(2, request.probe.formats.size)
+                selection
+            }
+        )
+
+        val request = report.requests.single()
+        assertEquals(selection, request.selection)
+        assertEquals("Choose Me.mkv", request.fileName)
+        assertEquals("video/x-matroska", request.mimeType)
+        assertEquals(720, request.height)
+    }
+
+    @Test
+    fun interactivePlaylistProbesAndChoosesEveryEntry() = runBlocking {
+        val playlistUrl = "https://www.youtube.com/playlist?list=choose"
+        val oneUrl = "https://youtu.be/choose1"
+        val twoUrl = "https://youtu.be/choose2"
+        fun probe(title: String) = ExtractorEngine.Probe(
+            ok = true, title = title, formats = listOf(
+                ExtractorEngine.FormatRow(title, "mp4", 720, null, 1000, false, true, "")
+            )
+        )
+        val engine = FakeEngine(probes = mapOf(
+            playlistUrl to ExtractorEngine.Probe(
+                ok = true, title = "Queue", isPlaylist = true, entries = listOf(
+                    ExtractorEngine.PlaylistEntry("One", oneUrl, 10),
+                    ExtractorEngine.PlaylistEntry("Two", twoUrl, 20)
+                )
+            ),
+            oneUrl to probe("One"), twoUrl to probe("Two")
+        ))
+        val report = LinkIngestor(engine).ingest(
+            listOf(playlistUrl), preset = "best", chooser = { request ->
+                ExtractorEngine.FormatSelection(
+                    request.probe.formats.single().id, outputKind = "video"
+                )
+            }
+        )
+
+        assertEquals(listOf("One", "Two"), report.requests.map { it.selection?.formatId })
+        assertEquals(3, engine.probeCalls)
+    }
+
+    @Test
+    fun interactiveSpotifyUsesAudioOnlyChooserAndSelectedExtension() = runBlocking {
+        val spotifyUrl = "https://open.spotify.com/track/choose"
+        val hitUrl = "https://youtu.be/audio-choice"
+        val query = "Artist Song audio"
+        val engine = FakeEngine(
+            probes = mapOf(hitUrl to ExtractorEngine.Probe(
+                ok = true, title = "Source", formats = listOf(
+                    ExtractorEngine.FormatRow("a", "m4a", 0, null, 100, true, false, "")
+                )
+            )),
+            searchResults = mapOf(query to listOf(
+                ExtractorEngine.SearchHit("Source", hitUrl, 30, "Artist")
+            ))
+        )
+        val collection = SpotifyResolver.Collection(
+            true, "Track", listOf(SpotifyResolver.Track("Song", "Artist", query))
+        )
+        val selection = ExtractorEngine.FormatSelection(
+            "a", outputExt = "mp3", outputKind = "audio", audioBitrateKbps = 320
+        )
+        val report = LinkIngestor(engine, spotifyLookup = { collection }).ingest(
+            listOf(spotifyUrl), preset = "best", chooser = { request ->
+                assertTrue(request.audioOnly)
+                assertEquals("Artist - Song", request.displayTitle)
+                selection
+            }
+        )
+
+        val request = report.requests.single()
+        assertEquals("Artist - Song.mp3", request.fileName)
+        assertEquals("audio/mpeg", request.mimeType)
+        assertEquals("audio", request.preset)
+        assertEquals("Spotify", request.extractor)
+        assertEquals(selection, request.selection)
+    }
+
+    @Test
     fun respectsTheItemCap() = runBlocking {
         val entries = (1..200).map {
             ExtractorEngine.PlaylistEntry("Item $it", "https://youtu.be/$it", 10)

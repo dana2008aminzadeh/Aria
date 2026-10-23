@@ -98,6 +98,11 @@ class DownloadStoreTest {
             engine = EngineKind.MEDIA,
             preset = "720",
             formatId = "298",
+            audioFormatId = "140",
+            outputExt = "mp3",
+            outputKind = "audio",
+            audioBitrateKbps = 256,
+            selectionLabel = "1080p • MP3",
             title = "My Video",
             extractor = "Youtube",
             warning = "ادغام انجام شد",
@@ -117,6 +122,12 @@ class DownloadStoreTest {
         assertEquals(720, restored.height)
         assertEquals(635L, restored.durationSec)
         assertEquals("ادغام انجام شد", restored.warning)
+        assertEquals("140", restored.audioFormatId)
+        assertEquals("mp3", restored.outputExt)
+        assertEquals(256, restored.audioBitrateKbps)
+        assertEquals("1080p • MP3", restored.selectionLabel)
+        assertEquals("140", restored.exactSelection()?.audioFormatId)
+        assertEquals(media, restored)
         assertTrue(restored.isMedia)
     }
 
@@ -134,6 +145,7 @@ class DownloadStoreTest {
         assertEquals(2, items.size)
         assertTrue(items.all { it.engine == EngineKind.HTTP })
         assertEquals("best", items.first().preset)
+        assertEquals(null, items.first().exactSelection())
         assertEquals(3L, store.newId())
     }
 

@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import ir.aria.downloader.data.DownloadRepository
 import ir.aria.downloader.data.NewDownload
 import ir.aria.downloader.engine.EngineKind
+import ir.aria.downloader.engine.ExtractorEngine
 import ir.aria.downloader.model.DownloadStatus
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -81,6 +82,27 @@ class DownloadRepositoryTest {
         assertEquals(300L, item.durationSec)
         assertEquals(720, item.height)
         assertTrue(item.isMedia)
+    }
+
+    @Test
+    fun exactPerItemSelectionSurvivesRepositoryAndStore() {
+        val selection = ExtractorEngine.FormatSelection(
+            formatId = "248", audioFormatId = "251", outputExt = "mp3",
+            outputKind = "audio", audioBitrateKbps = 192, label = "1080p • MP3"
+        )
+        val item = repo.addRequests(listOf(NewDownload(
+            url = "https://www.youtube.com/watch?v=exact",
+            fileName = "Exact.mp3",
+            engine = EngineKind.MEDIA,
+            selection = selection
+        ))).single()
+
+        assertEquals("248", item.formatId)
+        assertEquals("251", item.audioFormatId)
+        assertEquals("audio/mpeg", item.mimeType)
+        assertEquals(selection, item.exactSelection())
+        repo.persistNow()
+        assertEquals(selection, repo.store.load().single().exactSelection())
     }
 
     @Test

@@ -58,7 +58,7 @@ class DownloadStore(private val file: File) {
     fun save(): Boolean = synchronized(lock) {
         return try {
             val root = JSONObject()
-            root.put("version", 2)
+            root.put("version", 3)
             root.put("nextId", nextId)
             val array = JSONArray()
             for (item in items.values) array.put(item.toJson())

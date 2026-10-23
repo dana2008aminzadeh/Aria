@@ -36,6 +36,7 @@ class SettingsTest {
         assertTrue(settings.autoRetry)
         assertEquals("best", settings.defaultPreset)
         assertEquals(HttpDownloader.DEFAULT_USER_AGENT, settings.userAgent)
+        assertEquals("", settings.proxyUrl)
     }
 
     @Test
@@ -47,6 +48,7 @@ class SettingsTest {
         settings.autoRetry = false
         settings.defaultPreset = "1080"
         settings.userAgent = "CustomAgent/2.0"
+        settings.proxyUrl = "  socks5://127.0.0.1:1080  "
 
         val reopened = Settings(context)
         assertEquals(7, reopened.concurrency)

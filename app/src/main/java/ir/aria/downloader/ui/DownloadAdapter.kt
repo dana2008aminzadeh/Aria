@@ -110,6 +110,7 @@ class DownloadAdapter(
 
         private fun qualitySuffix(item: DownloadItem): String = when {
             !item.isMedia -> ""
+            !item.selectionLabel.isNullOrBlank() -> " • " + item.selectionLabel
             item.preset == "audio" -> " • " + binding.root.context.getString(R.string.quality_audio)
             item.height > 0 -> " • ${item.height}p"
             else -> ""

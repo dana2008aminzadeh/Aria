@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
-import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -32,11 +31,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 /**
  * Add screen: paste any text (one or many links, playlist links, batch patterns),
- * pick a quality preset, then the [LinkIngestor] turns everything into queue items.
+ * then probes every media item and asks for its exact format and output before queueing.
  */
 class AddActivity : AppCompatActivity() {
 
@@ -44,8 +45,6 @@ class AddActivity : AppCompatActivity() {
     private lateinit var repo: DownloadRepository
     private var previewJob: Job? = null
     private var busy = false
-
-    private val presetKeys = arrayOf("best", "1080", "720", "480", "360", "audio")
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -77,8 +76,6 @@ class AddActivity : AppCompatActivity() {
         binding.clearButton.setOnClickListener { binding.urlInput.setText("") }
         binding.startButton.setOnClickListener { startDownloads() }
 
-        setupQualityPicker()
-
         binding.urlInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -101,33 +98,6 @@ class AddActivity : AppCompatActivity() {
         if (prefs.getBoolean("notification_permission_requested", false)) return
         prefs.edit().putBoolean("notification_permission_requested", true).apply()
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-    }
-
-    private fun presetLabels(): List<String> = listOf(
-        getString(R.string.quality_best),
-        getString(R.string.quality_1080),
-        getString(R.string.quality_720),
-        getString(R.string.quality_480),
-        getString(R.string.quality_360),
-        getString(R.string.quality_audio)
-    )
-
-    private fun setupQualityPicker() {
-        val labels = presetLabels()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, labels)
-        binding.qualitySpinner.setAdapter(adapter)
-        val saved = repo.settings.defaultPreset
-        val index = presetKeys.indexOf(saved).coerceAtLeast(0)
-        binding.qualitySpinner.setText(labels[index], false)
-        binding.qualitySpinner.setOnItemClickListener { _, _, position, _ ->
-            repo.settings.defaultPreset = presetKeys[position]
-        }
-    }
-
-    private fun selectedPreset(): String {
-        val text = binding.qualitySpinner.text?.toString().orEmpty()
-        val index = presetLabels().indexOf(text)
-        return if (index >= 0) presetKeys[index] else "best"
     }
 
     private fun ensureStoragePermission() {
@@ -209,7 +179,11 @@ class AddActivity : AppCompatActivity() {
                     Logs.d(this@AddActivity, "add", "parsed " + links.size + " link(s)")
                     val engine = ExtractorEngine.get(this@AddActivity)
                     val ingestor = LinkIngestor(engine)
-                    ingestor.ingest(links, selectedPreset()) { status ->
+                    ingestor.ingest(
+                        links = links,
+                        preset = repo.settings.defaultPreset,
+                        chooser = { request -> chooseFormat(request) }
+                    ) { status ->
                         Logs.d(this@AddActivity, "add", "status: " + status)
                         runOnUiThread {
                             if (!isFinishing && !isDestroyed) binding.progressText.text = status
@@ -239,6 +213,32 @@ class AddActivity : AppCompatActivity() {
                 finishBusy()
                 showFailure(t)
             }
+        }
+    }
+
+    private suspend fun chooseFormat(
+        request: LinkIngestor.ChoiceRequest
+    ): ExtractorEngine.FormatSelection? = withContext(Dispatchers.Main.immediate) {
+        suspendCancellableCoroutine { continuation ->
+            if (isFinishing || isDestroyed) {
+                continuation.resume(null)
+                return@suspendCancellableCoroutine
+            }
+            val dialog = try {
+                FormatChooserDialog.show(
+                    context = this@AddActivity,
+                    title = request.displayTitle.ifBlank { request.probe.title },
+                    formats = request.probe.formats,
+                    audioOnly = request.audioOnly
+                ) { selection ->
+                    if (continuation.isActive) continuation.resume(selection)
+                }
+            } catch (t: Throwable) {
+                Logs.e(this@AddActivity, "add", "format chooser failed", t)
+                if (continuation.isActive) continuation.resume(null)
+                null
+            }
+            continuation.invokeOnCancellation { dialog?.dismiss() }
         }
     }
 

@@ -17,6 +17,7 @@ import ir.aria.downloader.data.DownloadRepository
 import ir.aria.downloader.data.Settings
 import ir.aria.downloader.databinding.ActivitySettingsBinding
 import ir.aria.downloader.engine.ExtractorEngine
+import ir.aria.downloader.net.ProxyUrlValidator
 import ir.aria.downloader.service.DownloadService
 import ir.aria.downloader.service.NotificationSupport
 import ir.aria.downloader.util.Formats
@@ -124,6 +125,25 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         setupPresetPicker()
+
+        binding.proxyInput.setText(settings.proxyUrl)
+        binding.proxySave.setOnClickListener {
+            val raw = binding.proxyInput.text?.toString().orEmpty()
+            try {
+                val normalized = ProxyUrlValidator.normalize(raw)
+                settings.proxyUrl = normalized
+                binding.proxyInput.setText(normalized)
+                binding.proxyInput.setSelection(normalized.length)
+                notifyService()
+                Toast.makeText(
+                    this,
+                    if (normalized.isEmpty()) R.string.proxy_cleared else R.string.proxy_saved,
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: IllegalArgumentException) {
+                Toast.makeText(this, R.string.proxy_invalid, Toast.LENGTH_LONG).show()
+            }
+        }
 
         binding.cookiesImport.setOnClickListener {
             pickCookies.launch(arrayOf("text/*", "application/octet-stream", "*/*"))

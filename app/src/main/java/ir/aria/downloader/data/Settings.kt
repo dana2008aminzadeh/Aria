@@ -18,6 +18,7 @@ class Settings(context: Context) {
         const val KEY_AUTO_RETRY = "auto_retry"
         const val KEY_USER_AGENT = "user_agent"
         const val KEY_DEFAULT_PRESET = "default_preset"
+        const val KEY_PROXY_URL = "proxy_url"
         const val DEFAULT_CONCURRENCY = 3
         const val MAX_CONCURRENCY = 10
         const val DEFAULT_FRAGMENT_CONCURRENCY = 4
@@ -53,8 +54,13 @@ class Settings(context: Context) {
             ?: HttpDownloader.DEFAULT_USER_AGENT
         set(value) = prefs.edit().putString(KEY_USER_AGENT, value).apply()
 
-    /** Quality preset used by default for media links. */
+    /** Quality preset used only as a legacy/failure fallback; new items get exact choices. */
     var defaultPreset: String
         get() = prefs.getString(KEY_DEFAULT_PRESET, "best") ?: "best"
         set(value) = prefs.edit().putString(KEY_DEFAULT_PRESET, value).apply()
+
+    /** Optional HTTP(S)/SOCKS5 proxy URL, including optional user:password authority. */
+    var proxyUrl: String
+        get() = prefs.getString(KEY_PROXY_URL, "").orEmpty().trim()
+        set(value) = prefs.edit().putString(KEY_PROXY_URL, value.trim()).apply()
 }

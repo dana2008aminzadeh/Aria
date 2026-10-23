@@ -1,6 +1,7 @@
 package ir.aria.downloader.model
 
 import ir.aria.downloader.engine.EngineKind
+import ir.aria.downloader.engine.ExtractorEngine
 import org.json.JSONObject
 
 enum class DownloadStatus {
@@ -36,12 +37,31 @@ data class DownloadItem(
     val engine: EngineKind = EngineKind.HTTP,
     val preset: String = "best",
     val formatId: String? = null,
+    val audioFormatId: String? = null,
+    val outputExt: String? = null,
+    val outputKind: String = "",
+    val audioBitrateKbps: Int = 0,
+    val selectionLabel: String? = null,
     val title: String? = null,
     val extractor: String? = null,
     val warning: String? = null,
     val height: Int = 0,
     val durationSec: Long? = null
 ) {
+    /** Returns null for legacy queue entries, which retain their old preset behavior. */
+    fun exactSelection(): ExtractorEngine.FormatSelection? {
+        val primary = formatId?.takeIf { it.isNotBlank() } ?: return null
+        if (outputKind.isBlank()) return null
+        return ExtractorEngine.FormatSelection(
+            formatId = primary,
+            audioFormatId = audioFormatId,
+            outputExt = outputExt,
+            outputKind = outputKind,
+            audioBitrateKbps = audioBitrateKbps,
+            label = selectionLabel.orEmpty()
+        )
+    }
+
     val progressPercent: Int
         get() = when {
             status == DownloadStatus.COMPLETED -> 100
@@ -73,6 +93,11 @@ data class DownloadItem(
         put("engine", engine.name)
         put("preset", preset)
         put("formatId", formatId ?: JSONObject.NULL)
+        put("audioFormatId", audioFormatId ?: JSONObject.NULL)
+        put("outputExt", outputExt ?: JSONObject.NULL)
+        put("outputKind", outputKind)
+        put("audioBitrateKbps", audioBitrateKbps)
+        put("selectionLabel", selectionLabel ?: JSONObject.NULL)
         put("title", title ?: JSONObject.NULL)
         put("extractor", extractor ?: JSONObject.NULL)
         put("warning", warning ?: JSONObject.NULL)
@@ -105,6 +130,11 @@ data class DownloadItem(
             engine = EngineKind.fromName(o.optString("engine", "HTTP")),
             preset = o.optString("preset", "best"),
             formatId = o.stringOrNull("formatId"),
+            audioFormatId = o.stringOrNull("audioFormatId"),
+            outputExt = o.stringOrNull("outputExt"),
+            outputKind = o.optString("outputKind", ""),
+            audioBitrateKbps = o.optInt("audioBitrateKbps", 0),
+            selectionLabel = o.stringOrNull("selectionLabel"),
             title = o.stringOrNull("title"),
             extractor = o.stringOrNull("extractor"),
             warning = o.stringOrNull("warning"),

@@ -12,6 +12,13 @@ interface ExtractorApi {
 
     suspend fun resolve(url: String, preset: String): ExtractorEngine.Plan
 
+    /** Exact-selection overload; legacy test/fake engines can keep using the preset path. */
+    suspend fun resolve(
+        url: String,
+        preset: String,
+        selection: ExtractorEngine.FormatSelection?
+    ): ExtractorEngine.Plan = resolve(url, preset)
+
     suspend fun search(query: String, limit: Int = 1): List<ExtractorEngine.SearchHit>
 
     suspend fun download(

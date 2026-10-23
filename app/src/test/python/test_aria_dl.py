@@ -79,6 +79,105 @@ class FormatSelectionTest(unittest.TestCase):
         self.assertIn("ترکیبی", warning)
 
 
+class ExactFormatSelectionTest(unittest.TestCase):
+    def setUp(self):
+        self.info = {"formats": [
+            {"format_id": "137", "ext": "mp4", "height": 1080, "width": 1920,
+             "vcodec": "avc1.640028", "acodec": "none", "tbr": 4500},
+            {"format_id": "248", "ext": "webm", "height": 1080, "width": 1920,
+             "vcodec": "vp09.00.10.08", "acodec": "none", "fps": 30},
+            {"format_id": "313", "ext": "webm", "height": 2160, "width": 3840,
+             "vcodec": "vp09.00.10.08", "acodec": "none"},
+            {"format_id": "140", "ext": "m4a", "vcodec": "none",
+             "acodec": "mp4a.40.2", "abr": 129},
+            {"format_id": "251", "ext": "webm", "vcodec": "none",
+             "acodec": "opus", "abr": 160, "language": "en"},
+            {"format_id": "18", "ext": "mp4", "height": 360,
+             "vcodec": "avc1.42001E", "acodec": "mp4a.40.2"},
+            {"format_id": "story", "ext": "mhtml", "format_note": "storyboard"},
+        ]}
+
+    def test_public_formats_keep_non_avc_and_full_metadata(self):
+        rows = aria_dl._usable_rows(self.info)
+        public = aria_dl._public_formats(rows)
+        by_id = {row["id"]: row for row in public}
+
+        self.assertEqual(6, len(public))
+        self.assertIn("313", by_id)
+        self.assertEqual("vp09.00.10.08", by_id["248"]["vcodec"])
+        self.assertEqual(1920, by_id["248"]["width"])
+        self.assertTrue(by_id["248"]["video_only"])
+        self.assertEqual("opus", by_id["251"]["acodec"])
+        self.assertEqual("en", by_id["251"]["language"])
+        self.assertNotIn("story", by_id)
+
+    def test_exact_vp9_opus_pair_uses_webm(self):
+        rows = aria_dl._usable_rows(self.info)
+        plan, warning = aria_dl._choose_plan(rows, "best", {
+            "selected_format_id": "248", "selected_audio_id": "251",
+            "output_kind": "video", "output_ext": "",
+        })
+
+        self.assertIsNone(warning)
+        self.assertEqual("merge", plan["mode"])
+        self.assertEqual("248", plan["video_id"])
+        self.assertEqual("251", plan["audio_id"])
+        self.assertEqual("webm", plan["ext"])
+        self.assertEqual("merge", plan["postprocess"])
+
+    def test_audio_output_from_pair_does_not_download_video(self):
+        rows = aria_dl._usable_rows(self.info)
+        plan, _ = aria_dl._choose_plan(rows, "best", {
+            "selected_format_id": "313", "selected_audio_id": "251",
+            "output_kind": "audio", "output_ext": "mp3", "audio_bitrate": 192,
+        })
+
+        self.assertEqual("single", plan["mode"])
+        self.assertEqual("251", plan["format_id"])
+        self.assertNotIn("video_id", plan)
+        self.assertTrue(plan["audio_only"])
+        self.assertEqual("audio", plan["postprocess"])
+        self.assertEqual(192, plan["audio_bitrate"])
+
+    def test_progressive_container_change_is_real_remux_plan(self):
+        rows = aria_dl._usable_rows(self.info)
+        plan, _ = aria_dl._choose_plan(rows, "best", {
+            "selected_format_id": "18", "output_kind": "video", "output_ext": "mkv",
+        })
+
+        self.assertEqual("single", plan["mode"])
+        self.assertEqual("18", plan["format_id"])
+        self.assertEqual("mkv", plan["ext"])
+        self.assertEqual("remux", plan["postprocess"])
+
+    def test_original_audio_stays_untouched(self):
+        rows = aria_dl._usable_rows(self.info)
+        plan, _ = aria_dl._choose_plan(rows, "best", {
+            "selected_format_id": "140", "output_kind": "audio", "output_ext": "",
+        })
+
+        self.assertEqual("m4a", plan["ext"])
+        self.assertEqual("none", plan["postprocess"])
+        self.assertEqual("140", plan["format_id"])
+
+    def test_exact_selection_never_silently_falls_back(self):
+        rows = aria_dl._usable_rows(self.info)
+        plan, error = aria_dl._choose_plan(rows, "best", {
+            "selected_format_id": "removed", "output_kind": "video",
+        })
+        self.assertIsNone(plan)
+        self.assertIn("انتخاب‌شده", error)
+
+    def test_incompatible_container_is_rejected(self):
+        rows = aria_dl._usable_rows(self.info)
+        plan, error = aria_dl._choose_plan(rows, "best", {
+            "selected_format_id": "137", "selected_audio_id": "140",
+            "output_kind": "video", "output_ext": "webm",
+        })
+        self.assertIsNone(plan)
+        self.assertIn("سازگار", error)
+
+
 class TransferOptionsTest(unittest.TestCase):
     def test_parallel_fragments_chunks_and_io_buffer_are_enabled(self):
         opts = aria_dl._base_opts({"fragment_concurrency": 6})
@@ -88,6 +187,11 @@ class TransferOptionsTest(unittest.TestCase):
         self.assertEqual(aria_dl.IO_BUFFER_SIZE, opts["buffersize"])
         self.assertEqual(5, opts["fragment_retries"])
 
+    def test_proxy_is_trimmed_and_blank_proxy_is_ignored(self):
+        opts = aria_dl._base_opts({"proxy": "  socks5://127.0.0.1:1080  "})
+        self.assertEqual("socks5://127.0.0.1:1080", opts["proxy"])
+        self.assertNotIn("proxy", aria_dl._base_opts({"proxy": "   "}))
+
     def test_fragment_concurrency_is_clamped(self):
         self.assertEqual(1, aria_dl._base_opts({"fragment_concurrency": 0})[
             "concurrent_fragment_downloads"])
@@ -95,6 +199,22 @@ class TransferOptionsTest(unittest.TestCase):
             {"fragment_concurrency": 99})["concurrent_fragment_downloads"])
         self.assertEqual(aria_dl.DEFAULT_FRAGMENT_CONCURRENCY, aria_dl._base_opts(
             {"fragment_concurrency": "invalid"})["concurrent_fragment_downloads"])
+
+
+class NetworkErrorTest(unittest.TestCase):
+    def test_connection_refused_has_actionable_proxy_guidance(self):
+        error = RuntimeError(
+            "Unable to download webpage: [Errno 111] Connection refused "
+            "(caused by ConnectionRefusedError(111, 'Connection refused'))"
+        )
+        message = aria_dl._human_error(error)
+        self.assertIn("Errno 111", message)
+        self.assertIn("پروکسی", message)
+
+    def test_dns_failure_is_distinguished(self):
+        message = aria_dl._human_error(
+            RuntimeError("Temporary failure in name resolution"))
+        self.assertIn("DNS", message)
 
 
 class ExtractionFlowTest(unittest.TestCase):
@@ -126,6 +246,30 @@ class ExtractionFlowTest(unittest.TestCase):
         self.assertEqual("http-720p", result["format_id"])
         self.assertEqual("single", result["mode"])
         self.assertEqual("Aparat video", result["title"])
+
+    def test_resolve_reads_exact_selection_from_options_json(self):
+        info = {
+            "title": "Exact",
+            "formats": [
+                {"format_id": "v", "ext": "webm", "height": 1440,
+                 "vcodec": "vp09", "acodec": "none"},
+                {"format_id": "a", "ext": "webm", "vcodec": "none",
+                 "acodec": "opus", "abr": 128},
+            ],
+        }
+        options = json.dumps({
+            "preset": "360", "selected_format_id": "v", "selected_audio_id": "a",
+            "output_kind": "video", "output_ext": "webm",
+            "selection_label": "1440p • WebM",
+        })
+        with mock.patch.object(aria_dl, "_extract", return_value=info):
+            result = json.loads(aria_dl.resolve("https://example.com/v", options))
+
+        self.assertTrue(result["ok"])
+        self.assertEqual("v", result["video_id"])
+        self.assertEqual("a", result["audio_id"])
+        self.assertEqual("webm", result["ext"])
+        self.assertEqual("1440p • WebM", result["note"])
 
 
 if __name__ == "__main__":
