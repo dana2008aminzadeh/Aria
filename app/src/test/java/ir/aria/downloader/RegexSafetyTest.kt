@@ -28,6 +28,20 @@ class RegexSafetyTest {
             when {
                 c == '\\' -> {
                     if (i + 1 >= pattern.length) problems.add("trailing backslash at $i")
+                    // ICU supports Unicode property escapes such as \p{L}, \p{N} and
+                    // \p{M}. Their braces are part of the escape, not bare quantifiers.
+                    if (i + 2 < pattern.length &&
+                        (pattern[i + 1] == 'p' || pattern[i + 1] == 'P') &&
+                        pattern[i + 2] == '{'
+                    ) {
+                        val close = pattern.indexOf('}', i + 3)
+                        if (close < 0) {
+                            problems.add("unclosed Unicode property escape at $i")
+                            return problems
+                        }
+                        i = close + 1
+                        continue
+                    }
                     i += 2
                     continue
                 }
@@ -152,6 +166,9 @@ class RegexSafetyTest {
         assertTrue(icuFindings("""^file-\d+\.bin$""").isEmpty())
         assertTrue(icuFindings("""https?://[^\s<>"']+""").isEmpty())
         assertTrue(icuFindings("""bytes\s+(\d+)-(\d+)/(\d+|\*)""").isEmpty())
+        assertTrue(icuFindings("""\p{L}+""").isEmpty())
+        assertTrue(icuFindings("""[^\p{L}\p{N}]+""").isEmpty())
+        assertTrue(icuFindings("""\p{M}+""").isEmpty())
         // legitimate quantifiers stay legal
         assertTrue(icuFindings("""^a{2}$""").isEmpty())
         assertTrue(icuFindings("""^a{2,}$""").isEmpty())
