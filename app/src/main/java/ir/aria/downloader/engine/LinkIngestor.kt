@@ -79,12 +79,24 @@ class LinkIngestor(
                         var added = 0
                         for (track in collection.tracks) {
                             if (requests.size >= MAX_ITEMS) break
-                            onStatus("اسپاتیفای: ${track.title}")
-                            val hit = engine.search(track.query, 1).firstOrNull()
-                            if (hit == null) {
-                                warnings.add("آهنگ «${track.title}» پیدا نشد")
+                            onStatus("اسپاتیفای: جست‌وجوی ${track.title}")
+                            var candidates = engine.search(track.query, 8)
+                            var match = SpotifyMatcher.bestMatch(track, candidates)
+                            if (match == null) {
+                                val preciseQuery = SpotifyResolver.preciseQuery(track.title, track.artists)
+                                if (preciseQuery != track.query) {
+                                    onStatus("تطبیق دقیق‌تر: ${track.title}")
+                                    candidates = candidates + engine.search(preciseQuery, 5)
+                                    match = SpotifyMatcher.bestMatch(track, candidates)
+                                }
+                            }
+                            val matched = match
+                            if (matched == null) {
+                                warnings.add("نتیجهٔ مطمئن برای آهنگ «${track.title}» پیدا نشد؛ نتیجهٔ مشابه/اشتباه دانلود نمی‌شود.")
                                 continue
                             }
+                            val hit = matched.hit
+                            onStatus("تطبیق Spotify: ${hit.title}")
                             val displayTitle = listOf(track.artists, track.title)
                                 .filter { it.isNotBlank() }.joinToString(" - ")
                             var request: NewDownload? = null

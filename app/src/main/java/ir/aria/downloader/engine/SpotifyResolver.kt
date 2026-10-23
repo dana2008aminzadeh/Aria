@@ -21,7 +21,12 @@ class SpotifyResolver(
     private val readTimeoutMs: Int = 20_000
 ) {
 
-    data class Track(val title: String, val artists: String, val query: String)
+    data class Track(
+        val title: String,
+        val artists: String,
+        val query: String,
+        val durationSec: Long? = null
+    )
 
     data class Collection(
         val ok: Boolean,
@@ -40,18 +45,29 @@ class SpotifyResolver(
             setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
         )
 
+        fun cleanTitle(title: String): String = title
+            .replace(Regex("""\s*[\(\[]\s*(?:feat\.|ft\.|with)\s+[^\)\]]*[\)\]]""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""\s+(?:feat\.|ft\.)\s+.*$""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+
+        fun primaryArtist(artists: String): String = artists.split(',', '&')
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() }
+            .orEmpty()
+
         /** Builds the search query used against the media engine. */
-        fun buildQuery(title: String, artists: String): String {
-            val cleanTitle = title
-                .replace(Regex("""\s*[\(\[]?(feat\.|ft\.|with)\s[^\)\]]*[\)\]]?""", RegexOption.IGNORE_CASE), " ")
-                .replace(Regex("""\s+"""), " ")
-                .trim()
-            val artist = artists.split(',', '&', '/')
-                .map { it.trim() }
-                .firstOrNull { it.isNotBlank() }
-                .orEmpty()
-            return listOf(artist, cleanTitle).filter { it.isNotBlank() }.joinToString(" ") + " audio"
-        }
+        fun buildQuery(title: String, artists: String): String =
+            listOf(primaryArtist(artists), cleanTitle(title))
+                .filter { it.isNotBlank() }.joinToString(" ") + " audio"
+
+        /** A second pass with all artists; used only if the first candidates are unsafe. */
+        fun preciseQuery(title: String, artists: String): String =
+            listOf(artists.trim(), cleanTitle(title))
+                .filter { it.isNotBlank() }.joinToString(" ") + " official audio"
+
+        fun durationSeconds(durationMs: Long): Long? =
+            if (durationMs > 0) (durationMs + 500L) / 1000L else null
     }
 
     /** Parses the embedded JSON of a spotify embed page. Pure function, unit tested. */
@@ -86,7 +102,12 @@ class SpotifyResolver(
                             }.joinToString(", ")
                         }.orEmpty()
                     }
-                    tracks.add(Track(title, subtitle, buildQuery(title, subtitle)))
+                    tracks.add(Track(
+                        title = title,
+                        artists = subtitle,
+                        query = buildQuery(title, subtitle),
+                        durationSec = durationSeconds(item.optLong("duration", -1L))
+                    ))
                 }
             }
             if (tracks.isEmpty() && entity.optString("type") == "track" && name.isNotBlank()) {
@@ -97,7 +118,12 @@ class SpotifyResolver(
                         }.joinToString(", ")
                     }.orEmpty()
                 }
-                tracks.add(Track(name, subtitle, buildQuery(name, subtitle)))
+                tracks.add(Track(
+                    title = name,
+                    artists = subtitle,
+                    query = buildQuery(name, subtitle),
+                    durationSec = durationSeconds(entity.optLong("duration", -1L))
+                ))
             }
             if (tracks.isEmpty()) {
                 Collection(false, name, emptyList(), "ترکی در این لینک پیدا نشد (شاید پادکست یا آرتیست باشد)")

@@ -31,7 +31,7 @@ except Exception:  # pragma: no cover - optional
 
 import yt_dlp  # noqa: E402  (must come after the SSL env vars)
 
-ENGINE_VERSION = "2.2.0"
+ENGINE_VERSION = "2.2.1"
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular
