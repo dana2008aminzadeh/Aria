@@ -1,0 +1,126 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.chaquo.python'
+}
+
+// Release signing is optional for local builds and never requires secrets in Git.
+// Copy keystore.properties.example to keystore.properties when a signed release is needed.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+android {
+    namespace 'ir.aria.downloader'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "ir.aria.downloader"
+        minSdk 24
+        targetSdk 33
+        versionCode 5
+        versionName "2.1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            // The Python runtime is a native component. arm64-v8a covers every current phone;
+            // x86_64 is only needed for emulators, so it is left out of the release package
+            // to keep the APK small (the debug build still ships both).
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            release {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            applicationIdSuffix ".debug"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+    buildFeatures {
+        viewBinding true
+    }
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+            all {
+                maxHeapSize = "640m"
+                // Robolectric downloads ~100 MB of android-all jars. Keep them OUTSIDE the
+                // project so they are never part of the app/source tree or its snapshots.
+                systemProperty "robolectric.dependency.dir", "/tmp/robolectric-deps"
+                systemProperty "robolectric.logging.enabled", "false"
+            }
+        }
+    }
+    packagingOptions {
+        resources.excludes += ['META-INF/*.kotlin_module', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
+        // Ship the native libraries the way every Android version understands: extracted into
+        // the app's lib folder instead of being loaded straight out of the APK. Several OEM ROMs
+        // and the CPython runtime are much happier with this layout.
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        // Must match the CPython on the build machine (python3 --version).
+        version = "3.13"
+        pip {
+            // The extraction engine. yt-dlp is pure Python, so it installs fine on Android.
+            install "yt-dlp==2026.10.21"
+            install "certifi==2026.10.23"
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.recyclerview:recyclerview:1.3.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
+
+    // Lossless MP4 remuxing of the separate video/audio streams that DASH sites deliver.
+    implementation 'org.mp4parser:isoparser:1.9.56'
+    implementation 'org.mp4parser:muxer:1.9.56'
+    implementation('org.slf4j:slf4j-simple:1.7.36') {
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20230227'
+    testImplementation 'org.robolectric:robolectric:4.10.3'
+    testImplementation 'androidx.test:core:1.5.0'
+}

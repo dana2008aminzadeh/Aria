@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="cache" path="." />
+    <files-path name="files" path="." />
+    <external-files-path name="ext_files" path="." />
+    <!-- Android 7-9 save straight into /storage/emulated/0/Download/AriaDownloader -->
+    <external-path name="external" path="." />
+</paths>
