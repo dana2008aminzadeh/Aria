@@ -31,7 +31,31 @@ class ExtractorEngine private constructor(
         val filesize: Long?,
         val audioOnly: Boolean,
         val progressive: Boolean,
-        val note: String
+        val note: String,
+        val width: Int = 0,
+        val videoOnly: Boolean = !audioOnly && !progressive,
+        val hasAudio: Boolean = audioOnly || progressive,
+        val hasVideo: Boolean = !audioOnly,
+        val abr: Double? = null,
+        val vbr: Double? = null,
+        val tbr: Double? = null,
+        val sizeApprox: Boolean = false,
+        val vcodec: String? = null,
+        val acodec: String? = null,
+        val language: String = "",
+        val dynamicRange: String = "",
+        val sampleRate: Int = 0,
+        val audioChannels: Int = 0
+    )
+
+    /** Exact user choice persisted with one queue item, never a global quality preset. */
+    data class FormatSelection(
+        val formatId: String,
+        val audioFormatId: String? = null,
+        val outputExt: String? = null,
+        val outputKind: String = "video", // video | audio | video_only
+        val audioBitrateKbps: Int = 0,
+        val label: String = ""
     )
 
     data class PlaylistEntry(val title: String, val url: String, val durationSec: Long?)
@@ -68,7 +92,12 @@ class ExtractorEngine private constructor(
         val thumbnail: String? = null,
         val extractor: String = "",
         val warning: String? = null,
-        val audioOnly: Boolean = false
+        val audioOnly: Boolean = false,
+        val sourceExt: String = ext,
+        val outputKind: String = if (audioOnly) "audio" else "video",
+        val postprocess: String = if (mode == "merge") "merge" else "none",
+        val audioBitrateKbps: Int = 0,
+        val note: String = ""
     )
 
     data class MediaFile(val path: String, val size: Long)
@@ -156,6 +185,7 @@ class ExtractorEngine private constructor(
         obj.put("cookies_path", cookiesFile().absolutePath.takeIf { cookiesFile().exists() } ?: "")
         obj.put("user_agent", settings.userAgent)
         obj.put("fragment_concurrency", settings.fragmentConcurrency)
+        obj.put("proxy", settings.proxyUrl.trim())
         return obj.toString()
     }
 
@@ -170,12 +200,12 @@ class ExtractorEngine private constructor(
             val raw = module().callAttr("engine_info").toString()
             val json = JSONObject(raw)
             EngineInfo(
-                engine = json.optString("engine", "2.1.0"),
+                engine = json.optString("engine", "2.2.0"),
                 ytDlp = json.optString("yt_dlp", "?"),
                 python = json.optString("python", "?")
             )
         } catch (e: Throwable) {
-            EngineInfo("2.1.0", "unavailable", e.javaClass.simpleName)
+            EngineInfo("2.2.0", "unavailable", e.javaClass.simpleName)
         }
     }
 
@@ -214,7 +244,21 @@ class ExtractorEngine private constructor(
                             filesize = f.optLong("filesize", -1L).takeIf { it > 0 },
                             audioOnly = f.optBoolean("audio_only"),
                             progressive = f.optBoolean("progressive"),
-                            note = f.optString("note")
+                            note = f.optString("note"),
+                            width = f.optInt("width", 0),
+                            videoOnly = f.optBoolean("video_only"),
+                            hasAudio = f.optBoolean("has_audio"),
+                            hasVideo = f.optBoolean("has_video"),
+                            abr = f.optDouble("abr", 0.0).takeIf { !it.isNaN() && it > 0 },
+                            vbr = f.optDouble("vbr", 0.0).takeIf { !it.isNaN() && it > 0 },
+                            tbr = f.optDouble("tbr", 0.0).takeIf { !it.isNaN() && it > 0 },
+                            sizeApprox = f.optBoolean("size_approx"),
+                            vcodec = f.optString("vcodec").takeIf { it.isNotBlank() && it != "null" },
+                            acodec = f.optString("acodec").takeIf { it.isNotBlank() && it != "null" },
+                            language = f.optString("language"),
+                            dynamicRange = f.optString("dynamic_range"),
+                            sampleRate = f.optInt("asr", 0),
+                            audioChannels = f.optInt("audio_channels", 0)
                         )
                     )
                 }
@@ -237,9 +281,23 @@ class ExtractorEngine private constructor(
         }
     }
 
-    override suspend fun resolve(url: String, preset: String): Plan = withContext(Dispatchers.IO) {
+    override suspend fun resolve(url: String, preset: String): Plan = resolve(url, preset, null)
+
+    override suspend fun resolve(
+        url: String,
+        preset: String,
+        selection: FormatSelection?
+    ): Plan = withContext(Dispatchers.IO) {
         try {
             val options = JSONObject(optionsJson()).put("preset", preset)
+            selection?.let { chosen ->
+                options.put("selected_format_id", chosen.formatId)
+                options.put("selected_audio_id", chosen.audioFormatId ?: "")
+                options.put("output_ext", chosen.outputExt ?: "")
+                options.put("output_kind", chosen.outputKind)
+                options.put("audio_bitrate", chosen.audioBitrateKbps)
+                options.put("selection_label", chosen.label)
+            }
             val raw = module().callAttr("resolve", url, options.toString()).toString()
             val json = JSONObject(raw)
             if (!json.optBoolean("ok")) {
@@ -261,7 +319,12 @@ class ExtractorEngine private constructor(
                 thumbnail = json.optString("thumbnail").takeIf { it.isNotBlank() && it != "null" },
                 extractor = json.optString("extractor"),
                 warning = json.optString("warning").takeIf { it.isNotBlank() && it != "null" },
-                audioOnly = json.optBoolean("audio_only")
+                audioOnly = json.optBoolean("audio_only"),
+                sourceExt = json.optString("source_ext", json.optString("ext", "mp4")),
+                outputKind = json.optString("output_kind", "video"),
+                postprocess = json.optString("postprocess", "none"),
+                audioBitrateKbps = json.optInt("audio_bitrate", 0),
+                note = json.optString("note")
             )
         } catch (e: Throwable) {
             Plan(false, error = friendly(e))
@@ -270,7 +333,7 @@ class ExtractorEngine private constructor(
 
     override suspend fun search(query: String, limit: Int): List<SearchHit> = withContext(Dispatchers.IO) {
         try {
-            val raw = module().callAttr("search", query, limit).toString()
+            val raw = module().callAttr("search", query, limit, optionsJson()).toString()
             val json = JSONObject(raw)
             if (!json.optBoolean("ok")) return@withContext emptyList()
             val array: JSONArray = json.optJSONArray("entries") ?: JSONArray()
@@ -316,6 +379,7 @@ class ExtractorEngine private constructor(
                 .put("cookies_path", cookiesFile().absolutePath.takeIf { cookiesFile().exists() } ?: "")
                 .put("user_agent", settings.userAgent)
                 .put("fragment_concurrency", settings.fragmentConcurrency)
+                .put("proxy", settings.proxyUrl.trim())
 
             val listener = object {
                 @Suppress("unused")

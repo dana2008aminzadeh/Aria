@@ -2,6 +2,7 @@ package ir.aria.downloader.data
 
 import android.content.Context
 import ir.aria.downloader.engine.EngineKind
+import ir.aria.downloader.engine.ExtractorEngine
 import ir.aria.downloader.engine.MediaUrlNormalizer
 import ir.aria.downloader.engine.UrlClassifier
 import ir.aria.downloader.model.DownloadItem
@@ -21,7 +22,8 @@ data class NewDownload(
     val mimeType: String = "application/octet-stream",
     val extractor: String? = null,
     val durationSec: Long? = null,
-    val height: Int = 0
+    val height: Int = 0,
+    val selection: ExtractorEngine.FormatSelection? = null
 )
 
 /**
@@ -121,7 +123,10 @@ class DownloadRepository private constructor(context: Context) {
             val mime = when {
                 request.mimeType != "application/octet-stream" -> request.mimeType
                 guessedFromUrl != null -> FileNames.guessMime(name)
-                request.engine != EngineKind.HTTP && request.preset == "audio" -> "audio/mp4"
+                request.engine != EngineKind.HTTP &&
+                    (request.preset == "audio" || request.selection?.outputKind == "audio") ->
+                    request.selection?.outputExt?.takeIf { it.isNotBlank() }
+                        ?.let { FileNames.guessMime("audio.$it") } ?: "audio/mp4"
                 request.engine != EngineKind.HTTP -> "video/mp4"
                 else -> "application/octet-stream"
             }
@@ -134,6 +139,12 @@ class DownloadRepository private constructor(context: Context) {
                 createdAt = System.currentTimeMillis(),
                 engine = request.engine,
                 preset = request.preset,
+                formatId = request.selection?.formatId,
+                audioFormatId = request.selection?.audioFormatId,
+                outputExt = request.selection?.outputExt,
+                outputKind = request.selection?.outputKind.orEmpty(),
+                audioBitrateKbps = request.selection?.audioBitrateKbps ?: 0,
+                selectionLabel = request.selection?.label,
                 title = request.fileName,
                 extractor = request.extractor,
                 height = request.height,

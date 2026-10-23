@@ -20,8 +20,8 @@ android {
         applicationId "ir.aria.downloader"
         minSdk 24
         targetSdk 33
-        versionCode 5
-        versionName "2.1.0"
+        versionCode 6
+        versionName "2.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -110,7 +110,10 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
 
-    // Lossless MP4 remuxing of the separate video/audio streams that DASH sites deliver.
+    // Maintained LGPL FFmpegKit: real container/audio conversion, Android 15+/16 KB pages.
+    implementation 'dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.9'
+
+    // Fast path for legacy H.264/AAC MP4 remuxing; FFmpeg handles every other codec.
     implementation 'org.mp4parser:isoparser:1.9.56'
     implementation 'org.mp4parser:muxer:1.9.56'
     implementation('org.slf4j:slf4j-simple:1.7.36') {

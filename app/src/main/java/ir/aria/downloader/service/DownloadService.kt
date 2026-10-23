@@ -26,6 +26,7 @@ import ir.aria.downloader.model.DownloadItem
 import ir.aria.downloader.model.DownloadStatus
 import ir.aria.downloader.net.FileNames
 import ir.aria.downloader.net.HttpDownloader
+import ir.aria.downloader.net.MediaProcessor
 import ir.aria.downloader.net.MimeTypes
 import ir.aria.downloader.net.Mp4Remuxer
 import ir.aria.downloader.ui.MainActivity
@@ -350,8 +351,10 @@ class DownloadService : Service() {
             updateProgressNotification(force = false)
         }
 
-        Logs.d(this, "media", "resolve " + startItem.url + " preset=" + startItem.preset)
-        val plan = engine.resolve(startItem.url, startItem.preset)
+        val selection = startItem.exactSelection()
+        Logs.d(this, "media", "resolve " + startItem.url + " preset=" + startItem.preset +
+            " exact=" + (selection?.label ?: "legacy"))
+        val plan = engine.resolve(startItem.url, startItem.preset, selection)
         if (!plan.ok) {
             Logs.e(this, "media", "resolve failed: " + plan.error)
             failItem(id, plan.error ?: getString(R.string.download_failed))
@@ -366,7 +369,8 @@ class DownloadService : Service() {
         val ext = plan.ext.lowercase().ifBlank { "mp4" }
         val title = plan.title.ifBlank { startItem.fileName }
         val desiredName = buildFileName(title, ext)
-        val mime = if (plan.audioOnly) MimeTypes.mimeForExtension(ext) else "video/mp4"
+        val mime = MimeTypes.mimeForExtension(ext).takeIf { it != "application/octet-stream" }
+            ?: if (plan.audioOnly) "application/octet-stream" else "video/mp4"
         val plannedSize = plan.filesize
         repo.update(id, persist = true) {
             it.copy(
@@ -378,6 +382,7 @@ class DownloadService : Service() {
                 durationSec = plan.durationSec,
                 title = title,
                 warning = plan.warning,
+                selectionLabel = plan.note.ifBlank { it.selectionLabel.orEmpty() },
                 status = DownloadStatus.RUNNING
             )
         }
@@ -413,22 +418,31 @@ class DownloadService : Service() {
 
             val combinedBytes = baseBytes + audioFile.length()
             publish(combinedBytes, if (plannedSize > 0) plannedSize else combinedBytes, 0)
-            val merged = File(work, "merged-${id}.mp4")
-            merged.delete()
-            val remux = try {
-                Mp4Remuxer.remux(videoFile, audioFile, merged)
+            val merged = File(work, "merged-${id}.$ext")
+            val processed = try {
+                val fast = if (selection == null && ext == "mp4") {
+                    runCatching { Mp4Remuxer.remux(videoFile, audioFile, merged) }.getOrNull()
+                } else null
+                fast?.file ?: MediaProcessor.merge(videoFile, audioFile, merged)
             } catch (e: Exception) {
+                Logs.e(this, "media", "merge/transcode failed for item $id", e)
                 null
             }
-            if (remux == null) {
-                // Never lose the download: keep the video stream and tell the user.
-                val warning = getString(R.string.merge_failed_warning)
-                finishMedia(
-                    id, videoFile, buildFileName(title, "mp4"), "video/mp4",
-                    extraWarning = warning
-                )
+            if (processed == null) {
+                if (selection == null) {
+                    // Preserve the old queue's best-effort behavior only for legacy presets.
+                    val warning = getString(R.string.merge_failed_warning)
+                    finishMedia(id, videoFile, buildFileName(title, "mp4"), "video/mp4", warning)
+                } else {
+                    failItem(id, getString(R.string.media_processing_failed))
+                    return
+                }
             } else {
-                finishMedia(id, remux.file, buildFileName(title, "mp4"), "video/mp4", null)
+                if (shouldCancel()) {
+                    repo.update(id, persist = true) { it.copy(status = DownloadStatus.PAUSED, speedBps = 0) }
+                    return
+                }
+                finishMedia(id, processed, buildFileName(title, ext), mime, null)
             }
         } else {
             val outcome = engine.download(
@@ -441,18 +455,38 @@ class DownloadService : Service() {
                 return
             }
             val source = File(outcome.files.first().path)
-            val finalExt = FileNames.extensionOf(source.name).ifBlank { ext }
-            finishMedia(id, source, buildFileName(title, finalExt), mime, null)
+            val processed = try {
+                when (plan.postprocess) {
+                    "audio" -> MediaProcessor.convertAudio(
+                        source, File(work, "audio-${id}.$ext"), ext, plan.audioBitrateKbps
+                    )
+                    "remux" -> MediaProcessor.remux(
+                        source, File(work, "remuxed-${id}.$ext"),
+                        includeAudio = plan.outputKind != "video_only"
+                    )
+                    else -> source
+                }
+            } catch (e: Exception) {
+                Logs.e(this, "media", "output processing failed for item $id", e)
+                failItem(id, getString(R.string.media_processing_failed))
+                return
+            }
+            if (shouldCancel()) {
+                repo.update(id, persist = true) { it.copy(status = DownloadStatus.PAUSED, speedBps = 0) }
+                return
+            }
+            val finalExt = if (processed == source) FileNames.extensionOf(source.name).ifBlank { ext } else ext
+            val finalMime = MimeTypes.mimeForExtension(finalExt).takeIf {
+                it != "application/octet-stream"
+            } ?: mime
+            finishMedia(id, processed, buildFileName(title, finalExt), finalMime, null)
         }
         work.deleteRecursively()
         updateProgressNotification(force = true)
     }
 
-    private fun buildFileName(title: String, ext: String): String {
-        val cleanTitle = FileNames.sanitize(title, "media")
-        val name = if (FileNames.extensionOf(cleanTitle).isEmpty()) "$cleanTitle.$ext" else cleanTitle
-        return FileNames.sanitize(name, "media.$ext")
-    }
+    private fun buildFileName(title: String, ext: String): String =
+        FileNames.withExtension(title, ext)
 
     private fun finishMedia(
         id: Long,

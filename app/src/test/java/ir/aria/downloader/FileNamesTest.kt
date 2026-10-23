@@ -84,6 +84,13 @@ class FileNamesTest {
     }
 
     @Test
+    fun outputExtensionCannotBeShadowedByMediaTitle() {
+        assertEquals("Movie.mp3", FileNames.withExtension("Movie.mp4", "mp3"))
+        assertEquals("Song.m4a", FileNames.withExtension("Song.mp3", "m4a"))
+        assertEquals("Episode.2024.mkv", FileNames.withExtension("Episode.2024", "mkv"))
+    }
+
+    @Test
     fun persianAndEmojiNamesArePreserved() {
         val name = FileNames.sanitize("آهنگ جدید 🎵 (ریمیکس) [128k].m4a")
         assertTrue(name.contains("آهنگ جدید"))

@@ -11,12 +11,14 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ir.aria.downloader.BuildConfig
 import ir.aria.downloader.R
 import ir.aria.downloader.data.DownloadRepository
 import ir.aria.downloader.data.Settings
 import ir.aria.downloader.databinding.ActivitySettingsBinding
 import ir.aria.downloader.engine.ExtractorEngine
+import ir.aria.downloader.net.ProxyUrlValidator
 import ir.aria.downloader.service.DownloadService
 import ir.aria.downloader.service.NotificationSupport
 import ir.aria.downloader.util.Formats
@@ -125,6 +127,25 @@ class SettingsActivity : AppCompatActivity() {
 
         setupPresetPicker()
 
+        binding.proxyInput.setText(settings.proxyUrl)
+        binding.proxySave.setOnClickListener {
+            val raw = binding.proxyInput.text?.toString().orEmpty()
+            try {
+                val normalized = ProxyUrlValidator.normalize(raw)
+                settings.proxyUrl = normalized
+                binding.proxyInput.setText(normalized)
+                binding.proxyInput.setSelection(normalized.length)
+                notifyService()
+                Toast.makeText(
+                    this,
+                    if (normalized.isEmpty()) R.string.proxy_cleared else R.string.proxy_saved,
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: IllegalArgumentException) {
+                Toast.makeText(this, R.string.proxy_invalid, Toast.LENGTH_LONG).show()
+            }
+        }
+
         binding.cookiesImport.setOnClickListener {
             pickCookies.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
         }
@@ -136,6 +157,7 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.versionText.text = getString(R.string.version_format, BuildConfig.VERSION_NAME)
         binding.storageInfo.text = getString(R.string.storage_free, Formats.bytes(freeStorage()))
+        binding.licensesButton.setOnClickListener { showOpenSourceLicenses() }
 
         refreshCookiesStatus()
         loadEngineInfo()
@@ -193,6 +215,24 @@ class SettingsActivity : AppCompatActivity() {
                 append(getString(R.string.engine_ytdlp)).append(" ").append(info.ytDlp)
                 append(" • ").append(getString(R.string.engine_python)).append(" ").append(info.python)
             }
+        }
+    }
+
+    private fun showOpenSourceLicenses() {
+        lifecycleScope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching {
+                    listOf("FFMPEGKIT-THIRD-PARTY-NOTICES.txt", "FFMPEGKIT-LGPL-3.0.txt")
+                        .joinToString("\n\n") { name ->
+                            assets.open(name).bufferedReader().use { it.readText() }
+                        }
+                }.getOrDefault("FFmpegKit: https://github.com/ffmpegkit-maintained/ffmpeg")
+            }
+            MaterialAlertDialogBuilder(this@SettingsActivity)
+                .setTitle(R.string.open_source_licenses)
+                .setMessage(text)
+                .setPositiveButton(R.string.close, null)
+                .show()
         }
     }
 

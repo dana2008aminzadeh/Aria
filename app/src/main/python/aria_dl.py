@@ -31,7 +31,7 @@ except Exception:  # pragma: no cover - optional
 
 import yt_dlp  # noqa: E402  (must come after the SSL env vars)
 
-ENGINE_VERSION = "2.1.0"
+ENGINE_VERSION = "2.2.0"
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular
@@ -72,8 +72,24 @@ def _human_error(exc):
         return "دسترسی رد شد (۴۰۳). شاید لینک منقضی شده باشد."
     if "http error 404" in low:
         return "محتوا پیدا نشد (۴۰۴)."
+    if ("connection refused" in low or "connectionrefusederror" in low or
+            "errno 111" in low):
+        return ("اتصال به سرور رد شد (Errno 111). ممکن است سایت روی شبکهٔ فعلی "
+                "مسدود باشد. اینترنت یا VPN را بررسی کنید، یا یک پروکسی معتبر در "
+                "تنظیمات وارد کنید و دوباره تلاش کنید.")
+    if ("temporary failure in name resolution" in low or
+            "name or service not known" in low or "getaddrinfo failed" in low or
+            "nodename nor servname" in low):
+        return ("آدرس سرور از طریق DNS پیدا نشد. اتصال اینترنت و DNS/VPN را بررسی "
+                "کنید؛ در صورت محدودیت شبکه می‌توانید از پروکسی تنظیمات استفاده کنید.")
+    if "network is unreachable" in low or "errno 101" in low:
+        return ("مسیر شبکه به این سرور در دسترس نیست. اتصال اینترنت، VPN یا پروکسی "
+                "را بررسی کنید و دوباره تلاش کنید.")
     if "timed out" in low or "timeout" in low:
-        return "اتصال به سرور زمان‌بر شد. اتصال اینترنت را بررسی کنید."
+        return ("اتصال به سرور زمان‌بر شد. اینترنت را بررسی کنید؛ اگر سایت محدود "
+                "است، از VPN یا پروکسی تنظیمات استفاده کنید.")
+    if "certificate verify failed" in low or "ssl certificate" in low:
+        return "گواهی امن اتصال تأیید نشد. تاریخ دستگاه، VPN و پروکسی را بررسی کنید."
     if "drm" in low:
         return "این محتوا محافظت‌شده (DRM) است و قابل دانلود نیست."
     return msg or "خطای ناشناخته در استخراج"
@@ -108,8 +124,11 @@ def _base_opts(options):
     ua = options.get("user_agent")
     if ua:
         opts["http_headers"] = {"User-Agent": ua}
-    if options.get("proxy"):
-        opts["proxy"] = options["proxy"]
+    proxy = options.get("proxy")
+    if isinstance(proxy, str) and proxy.strip():
+        # yt-dlp passes this to both webpage extraction and media/fragment requests.
+        # Empty strings must not override the process/network defaults.
+        opts["proxy"] = proxy.strip()
     return opts
 
 
@@ -119,16 +138,20 @@ _AVC = re.compile(r"^(avc|h264)", re.I)
 _AAC = re.compile(r"^(mp4a|aac)", re.I)
 
 
-def _kind(f):
-    """Classifies a yt-dlp format dict for our purposes.
+def _int_value(value):
+    try:
+        return int(value) if value else None
+    except (TypeError, ValueError, OverflowError):
+        return None
 
-    A missing codec is not the same as the explicit string ``"none"``. Aparat and
-    Pornhub commonly return progressive MP4 rows with no codec fields at all. Treating
-    those missing fields as ``none`` used to discard every downloadable format.
-    This mirrors yt-dlp's own semantics: unknown codecs belong to a progressive row
-    until the extractor explicitly marks a track as audio-only or video-only.
+
+def _kind(f):
+    """Classifies a yt-dlp format without discarding unknown codecs.
+
+    A missing codec is not the explicit string ``"none"``. Aparat and Pornhub
+    commonly return progressive MP4 rows with no codec fields at all.
     """
-    ext = (f.get("ext") or "").lower()
+    ext = str(f.get("ext") or "").lower()
     raw_vcodec = f.get("vcodec")
     raw_acodec = f.get("acodec")
     vcodec = str(raw_vcodec).lower() if raw_vcodec is not None else ""
@@ -138,32 +161,46 @@ def _kind(f):
     is_mp4 = ext in ("mp4", "m4a", "m4v")
     avc = bool(_AVC.match(vcodec)) and ext == "mp4"
     aac = bool(_AAC.match(acodec)) and ext in ("m4a", "mp4")
+    exact_size = _int_value(f.get("filesize"))
+    approximate_size = _int_value(f.get("filesize_approx"))
     return {
         "id": str(f.get("format_id") or ""),
         "ext": ext,
-        "height": f.get("height") or 0,
+        "width": _int_value(f.get("width")) or 0,
+        "height": _int_value(f.get("height")) or 0,
         "fps": round(f["fps"], 2) if f.get("fps") else None,
         "abr": round(f["abr"], 1) if f.get("abr") else None,
+        "vbr": round(f["vbr"], 1) if f.get("vbr") else None,
         "tbr": round(f["tbr"], 1) if f.get("tbr") else None,
-        "filesize": int(f["filesize"]) if f.get("filesize") else (
-            int(f["filesize_approx"]) if f.get("filesize_approx") else None),
-        "has_size": bool(f.get("filesize") or f.get("filesize_approx")),
+        "filesize": exact_size or approximate_size,
+        "size_approx": not exact_size and bool(approximate_size),
+        "has_size": bool(exact_size or approximate_size),
         "quality": f.get("quality") or 0,
         "has_drm": bool(f.get("has_drm")),
         "has_video": has_video,
         "has_audio": has_audio,
         "audio_only": has_audio and not has_video,
+        "video_only": has_video and not has_audio,
         "progressive": has_video and has_audio,
         "avc": avc,
         "aac": aac,
         "mp4": is_mp4,
-        "note": _sanitize(f.get("format_note") or "", 40),
+        "note": _sanitize(f.get("format_note") or "", 80),
         "vcodec": vcodec if vcodec and vcodec != "none" else None,
         "acodec": acodec if acodec and acodec != "none" else None,
+        "language": _sanitize(f.get("language") or "", 40),
+        "dynamic_range": _sanitize(f.get("dynamic_range") or "", 30),
+        "asr": _int_value(f.get("asr")),
+        "audio_channels": _int_value(f.get("audio_channels")),
     }
 
 
 def _usable_rows(info):
+    """Returns every non-DRM audio/video rendition exposed by the extractor.
+
+    Storyboard/image rows are not media downloads. Low resolutions, non-AVC codecs,
+    WebM, unknown sizes and separate tracks are deliberately retained for the UI.
+    """
     rows = []
     seen = set()
     for f in info.get("formats") or []:
@@ -174,8 +211,6 @@ def _usable_rows(info):
             continue
         if not k["has_video"] and not k["has_audio"]:
             continue
-        if k["has_video"] and k["height"] and k["height"] < 144:
-            continue
         if k["has_drm"]:
             continue
         seen.add(k["id"])
@@ -184,15 +219,13 @@ def _usable_rows(info):
 
 
 def _best_video_pair(rows, limit_height):
-    """Best remuxable (H.264 mp4) video track at or below `limit_height`."""
-    candidates = [r for r in rows if r["has_video"] and not r["has_audio"] and r["avc"]]
+    """Best traditionally remuxable (H.264 mp4) video at/below a preset ceiling."""
+    candidates = [r for r in rows if r["video_only"] and r["avc"]]
     if limit_height:
         within = [r for r in candidates if r["height"] <= limit_height]
         candidates = within or candidates
     if not candidates:
         return None
-    # Prefer standard streams whose size is known: some premium/SABR renditions report no
-    # size and often need extra tokens, which makes the download fail halfway.
     candidates.sort(key=lambda r: (r["height"], 1 if r["has_size"] else 0,
                                    r.get("fps") or 0, r["tbr"] or 0, r["quality"] or 0),
                     reverse=True)
@@ -200,12 +233,12 @@ def _best_video_pair(rows, limit_height):
 
 
 def _best_audio(rows):
-    """Best audio track; m4a/AAC preferred because it can be muxed into mp4."""
+    """Best audio track; m4a/AAC remains the backwards-compatible preset default."""
     audio = [r for r in rows if r["audio_only"]]
     if not audio:
         return None
     m4a = [r for r in audio if r["aac"] or r["ext"] == "m4a"]
-    pool = m4a or audio
+    pool = list(m4a or audio)
     pool.sort(key=lambda r: (r["quality"] or 0, 1 if r["has_size"] else 0,
                              r["abr"] or r["tbr"] or 0), reverse=True)
     return pool[0]
@@ -223,104 +256,236 @@ def _best_progressive(rows, limit_height):
     return cands[0]
 
 
-def _choose_plan(rows, preset):
-    """
-    Returns (plan, warning).
+def _row(rows, format_id):
+    wanted = str(format_id or "")
+    return next((r for r in rows if r["id"] == wanted), None)
 
-    plan modes:
-      single  -> download one already muxed file
-      merge   -> download video + audio separately, then remux into mp4 on the device
-      audio   -> audio only
+
+def _codec_starts(row, key, prefixes):
+    codec = (row.get(key) or "").lower()
+    return not codec or codec.startswith(prefixes)
+
+
+def _mp4_compatible(video, audio=None):
+    # FFmpeg can stream-copy these codecs into MP4. MKV remains the universal fallback.
+    video_ok = _codec_starts(video, "vcodec", (
+        "avc", "h264", "hev", "hvc", "h265", "vp09", "vp9", "av01", "av1",
+        "mp4v", "mpeg4"))
+    if not video_ok:
+        return False
+    if audio is None:
+        return True
+    return _codec_starts(audio, "acodec", (
+        "mp4a", "aac", "ac-3", "ec-3", "alac", "mp3", "opus", "flac"))
+
+
+def _webm_compatible(video, audio=None):
+    video_ok = _codec_starts(video, "vcodec", ("vp8", "vp08", "vp9", "vp09", "av1", "av01"))
+    if not video_ok or not video.get("vcodec"):
+        return False
+    if audio is None:
+        return True
+    return _codec_starts(audio, "acodec", ("opus", "vorbis")) and bool(audio.get("acodec"))
+
+
+def _default_container(video, audio=None, single=False):
+    if single:
+        return video["ext"] or "mp4"
+    if _webm_compatible(video, audio) and (
+            video["ext"] == "webm" or (audio and audio["ext"] in ("webm", "ogg", "opus"))):
+        return "webm"
+    if _mp4_compatible(video, audio):
+        return "mp4"
+    if _webm_compatible(video, audio):
+        return "webm"
+    return "mkv"
+
+
+def _validate_container(video, audio, ext):
+    if ext == "mkv":
+        return True
+    if ext == "mp4":
+        return _mp4_compatible(video, audio)
+    if ext == "webm":
+        return _webm_compatible(video, audio)
+    return False
+
+
+def _base_plan(mode, source, ext, output_kind, postprocess):
+    plan = {
+        "mode": mode,
+        "ext": ext,
+        "source_ext": source["ext"],
+        "audio_only": output_kind == "audio",
+        "output_kind": output_kind,
+        "postprocess": postprocess,
+        "audio_bitrate": 0,
+        "filesize": source["filesize"],
+        "height": source["height"] if source["has_video"] else 0,
+        "fps": source.get("fps") if source["has_video"] else None,
+    }
+    if mode == "single":
+        plan["format_id"] = source["id"]
+    return plan
+
+
+def _exact_plan(rows, options):
+    """Builds a plan for the exact per-item selection persisted by Android.
+
+    No automatic fallback to another format is allowed here: a disappeared format id
+    produces an actionable error instead of silently downloading a different quality.
     """
+    selected = _row(rows, options.get("selected_format_id"))
+    if selected is None:
+        return None, "فرمت انتخاب‌شده دیگر ارائه نمی‌شود؛ لینک را دوباره اضافه و کیفیت را انتخاب کنید."
+
+    audio_id = options.get("selected_audio_id")
+    audio = _row(rows, audio_id) if audio_id else None
+    if audio_id and audio is None:
+        return None, "ردیف صوتی انتخاب‌شده دیگر در دسترس نیست؛ کیفیت را دوباره انتخاب کنید."
+    if audio is not None and not audio["audio_only"]:
+        return None, "ردیف انتخاب‌شده برای صدا، یک فرمت صوتی خالص نیست."
+    if selected["audio_only"] and audio is not None:
+        return None, "برای یک فرمت صوتی نمی‌توان ردیف صوتی دوم انتخاب کرد."
+    if selected["progressive"] and audio is not None:
+        return None, "این فرمت از قبل صدا دارد و به ردیف صوتی جدا نیاز ندارد."
+
+    output_kind = str(options.get("output_kind") or "auto").lower()
+    if output_kind == "auto":
+        output_kind = "audio" if selected["audio_only"] else "video"
+    if output_kind not in ("video", "audio", "video_only"):
+        return None, "نوع خروجی انتخاب‌شده معتبر نیست."
+    try:
+        audio_bitrate = max(0, min(512, int(options.get("audio_bitrate") or 0)))
+    except (TypeError, ValueError):
+        audio_bitrate = 0
+    requested_ext = str(options.get("output_ext") or "").lower().lstrip(".")
+    selection_label = _sanitize(options.get("selection_label") or "", 140)
+
+    if output_kind == "audio":
+        # If a separate audio track was selected, do not download and then discard the
+        # video. This makes MP3/M4A extraction from DASH items dramatically cheaper.
+        source = audio or selected
+        if not source["has_audio"]:
+            return None, "این فرمت صدا ندارد؛ یک ردیف صوتی یا فرمت ترکیبی انتخاب کنید."
+        target = requested_ext or (
+            source["ext"] if source["audio_only"] and source["ext"] else "m4a")
+        if target not in ("mp3", "m4a", "aac", "opus", "ogg", "flac", "wav",
+                          "webm", "mp4"):
+            return None, "پسوند خروجی صوتی پشتیبانی نمی‌شود."
+        if target in ("mp4", "webm") and not source["audio_only"]:
+            return None, "برای استخراج صدا یک پسوند صوتی مانند MP3 یا M4A انتخاب کنید."
+        direct = source["audio_only"] and target == source["ext"] and audio_bitrate == 0
+        plan = _base_plan("single", source, target, "audio", "none" if direct else "audio")
+        plan["audio_bitrate"] = audio_bitrate
+        plan["note"] = selection_label or (target.upper() + (
+            " %d kb/s" % audio_bitrate if audio_bitrate else ""))
+        plan["height"] = 0
+        return plan, None
+
+    if selected["audio_only"]:
+        return None, "برای خروجی ویدیویی باید یک فرمت دارای تصویر انتخاب شود."
+    if output_kind == "video_only" and selected["progressive"]:
+        return None, "حذف صدا از این فرمت ترکیبی پشتیبانی نمی‌شود؛ فرمت فقط‌تصویر انتخاب کنید."
+
+    warning = None
+    merge_audio = None
+    if selected["video_only"] and output_kind != "video_only":
+        merge_audio = audio or _best_audio(rows)
+        if merge_audio is None:
+            warning = "برای این فرمت صدا پیدا نشد؛ نسخهٔ فقط‌تصویر دانلود می‌شود."
+    mode = "merge" if merge_audio is not None else "single"
+    target = requested_ext or _default_container(
+        selected, merge_audio, single=(mode == "single"))
+    if target not in ("mp4", "mkv", "webm") and target != selected["ext"]:
+        return None, "پسوند خروجی ویدیویی پشتیبانی نمی‌شود."
+    if target in ("mp4", "mkv", "webm") and not _validate_container(selected, merge_audio, target):
+        return None, "کدک‌های انتخاب‌شده با این ظرف خروجی سازگار نیست؛ MKV را امتحان کنید."
+
+    postprocess = "merge" if mode == "merge" else (
+        "remux" if target != selected["ext"] else "none")
+    plan = _base_plan(mode, selected, target,
+                      "video_only" if output_kind == "video_only" or not merge_audio and selected["video_only"] else "video",
+                      postprocess)
+    if merge_audio is not None:
+        plan["video_id"] = selected["id"]
+        plan["audio_id"] = merge_audio["id"]
+        plan.pop("format_id", None)
+        plan["filesize"] = ((selected["filesize"] or 0) + (merge_audio["filesize"] or 0)) or None
+    plan["note"] = selection_label or (
+        ("%dp" % selected["height"]) if selected["height"] else selected["note"] or selected["id"])
+    if output_kind == "video_only":
+        plan["note"] = (selection_label or plan["note"]) + " • بدون صدا"
+    return plan, warning
+
+
+def _choose_plan(rows, preset, options=None):
+    """Returns (plan, warning), using exact selection or a legacy preset.
+
+    Legacy presets intentionally retain their previous YouTube/Spotify choices. Exact
+    selections support every public codec/container and real FFmpeg post-processing.
+    """
+    options = options or {}
+    if options.get("selected_format_id"):
+        return _exact_plan(rows, options)
+
     preset = (preset or "best").lower()
     if preset in ("audio", "music", "mp3"):
         a = _best_audio(rows)
         if a:
             ext = "m4a" if (a["aac"] or a["ext"] == "m4a") else (a["ext"] or "m4a")
-            return {
-                "mode": "single",
-                "format_id": a["id"],
-                "ext": ext,
-                "audio_only": True,
-                "filesize": a["filesize"],
-                "note": "صدا",
-            }, None
+            plan = _base_plan("single", a, ext, "audio", "none")
+            plan["note"] = "صدا"
+            return plan, None
         p = _best_progressive(rows, None)
         if p:
-            # Without ffmpeg we cannot strip the video track. Keep the valid combined
-            # file, but do not mislabel an MP4 video as an audio-only download.
             is_audio_container = p["ext"] in ("m4a", "mp3", "aac", "ogg", "opus", "flac", "wav")
-            return {"mode": "single", "format_id": p["id"], "ext": p["ext"],
-                    "audio_only": is_audio_container, "filesize": p["filesize"],
-                    "note": "صدا" if is_audio_container else "ویدیوی ترکیبی"}, \
-                "فایل صوتی جدا پیدا نشد؛ نسخهٔ ترکیبی با صدا دانلود می‌شود."
+            plan = _base_plan("single", p, p["ext"],
+                              "audio" if is_audio_container else "video", "none")
+            plan["note"] = "صدا" if is_audio_container else "ویدیوی ترکیبی"
+            return plan, "فایل صوتی جدا پیدا نشد؛ نسخهٔ ترکیبی با صدا دانلود می‌شود."
         return None, "فرمت صوتی پیدا نشد."
 
-    heights = {"2160": 2160, "1440": 1440, "1080": 1080, "720": 720, "480": 480, "360": 360}
+    heights = {"2160": 2160, "1440": 1440, "1080": 1080,
+               "720": 720, "480": 480, "360": 360}
     limit = heights.get(preset, 0) or 0
-
     video = _best_video_pair(rows, limit)
     audio = _best_audio(rows)
     if video and audio:
-        return {
-            "mode": "merge",
-            "video_id": video["id"],
-            "audio_id": audio["id"],
-            "height": video["height"],
-            "fps": video.get("fps"),
-            "ext": "mp4",
-            "filesize": ((video["filesize"] or 0) + (audio["filesize"] or 0)) or None,
-            "note": "%dp%s" % (video["height"], ("%d" % video["fps"]) if video.get("fps") else ""),
-        }, None
+        plan = _base_plan("merge", video, "mp4", "video", "merge")
+        plan["video_id"] = video["id"]
+        plan["audio_id"] = audio["id"]
+        plan["filesize"] = ((video["filesize"] or 0) + (audio["filesize"] or 0)) or None
+        plan["note"] = "%dp%s" % (video["height"], ("%d" % video["fps"]) if video.get("fps") else "")
+        return plan, None
 
     prog = _best_progressive(rows, limit)
     if prog:
         note = None
         if limit and prog["height"] and prog["height"] + 1 < limit:
             note = "بالاترین کیفیت موجود %dp است (سایت فرمت جداگانه تصویر/صدا نمی‌دهد)." % prog["height"]
-        return {
-            "mode": "single",
-            "format_id": prog["id"],
-            "height": prog["height"],
-            "fps": prog.get("fps"),
-            "ext": prog["ext"],
-            "filesize": prog["filesize"],
-            "note": prog["note"] or ("%dp" % (prog["height"] or 0)),
-        }, note
+        plan = _base_plan("single", prog, prog["ext"], "video", "none")
+        plan["note"] = prog["note"] or ("%dp" % (prog["height"] or 0))
+        return plan, note
 
-    if video and not audio:  # silent video
-        return {
-            "mode": "single",
-            "format_id": video["id"],
-            "height": video["height"],
-            "ext": video["ext"],
-            "filesize": video["filesize"],
-            "note": "ویدیو بدون صدا",
-        }, "این محتوا فایل صوتی جدا ندارد."
-
+    if video and not audio:
+        plan = _base_plan("single", video, video["ext"], "video_only", "none")
+        plan["note"] = "ویدیو بدون صدا"
+        return plan, "این محتوا فایل صوتی جدا ندارد."
     return None, "فرمت قابل دانلودی پیدا نشد."
 
 
 def _public_formats(rows):
-    """Format rows for the UI (quality picker)."""
+    """Complete media rows for the per-item quality/output picker."""
     out = []
     for r in rows:
-        if not (r["progressive"] or r["audio_only"] or r["avc"]):
-            continue
-        out.append({
-            "id": r["id"],
-            "ext": r["ext"],
-            "height": r["height"] or None,
-            "fps": r["fps"],
-            "abr": r["abr"],
-            "tbr": r["tbr"],
-            "filesize": r["filesize"],
-            "audio_only": r["audio_only"],
-            "progressive": r["progressive"],
-            "note": r["note"],
-        })
-    out.sort(key=lambda r: (0 if r["audio_only"] else 1, r["height"] or 0, r["filesize"] or 0),
-             reverse=True)
+        out.append({key: r.get(key) for key in (
+            "id", "ext", "width", "height", "fps", "abr", "vbr", "tbr",
+            "filesize", "size_approx", "audio_only", "video_only", "progressive",
+            "has_audio", "has_video", "note", "vcodec", "acodec", "language",
+            "dynamic_range", "asr", "audio_channels")})
+    out.sort(key=lambda r: (r["audio_only"], -(r["height"] or 0),
+                            -(r["tbr"] or r["abr"] or 0), r["id"]))
     return out
 
 
@@ -416,7 +581,7 @@ def resolve(url, options_json="{}"):
         if not rows:
             return json.dumps({"ok": False, "error": "فرمت قابل دانلودی پیدا نشد."},
                               ensure_ascii=False)
-        plan, warning = _choose_plan(rows, preset)
+        plan, warning = _choose_plan(rows, preset, options)
         if not plan:
             return json.dumps({"ok": False, "error": warning or "فرمت قابل دانلودی پیدا نشد."},
                               ensure_ascii=False)
@@ -584,10 +749,12 @@ def download(request_json, callback=None):
 # --------------------------------------------------------------------------- misc
 
 
-def search(query, limit=1):
+def search(query, limit=1, options_json="{}"):
     """Resolves a text query to stream urls (used by the Spotify bridge)."""
     try:
-        opts = _base_opts({"noplaylist": True})
+        options = json.loads(options_json or "{}")
+        options["noplaylist"] = True
+        opts = _base_opts(options)
         opts.update({"skip_download": True, "extract_flat": True})
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info("ytsearch%d:%s" % (max(1, int(limit)), query), download=False)

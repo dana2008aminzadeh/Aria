@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/mediaTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="2"
+            android:textColor="@color/aria_text"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            tools:text="عنوان ویدیو یا آهنگ" />
+
+        <TextView
+            android:id="@+id/formatSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/aria_text_dim"
+            android:textSize="11sp"
+            tools:text="۲۴ فرمت واقعی پیدا شد" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/source_format"
+            android:textColor="@color/aria_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/formatSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_input"
+            android:minHeight="52dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:spinnerMode="dropdown" />
+
+        <TextView
+            android:id="@+id/formatDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_input"
+            android:padding="10dp"
+            android:textColor="@color/aria_text_dim"
+            android:textDirection="ltr"
+            android:textSize="11sp"
+            tools:text="Format ID: 137\n1080p • 30fps • 850 MB" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/output_format"
+            android:textColor="@color/aria_text"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/outputSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_input"
+            android:minHeight="52dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:spinnerMode="dropdown" />
+
+        <TextView
+            android:id="@+id/outputDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/aria_blue"
+            android:textSize="11sp"
+            tools:text="بدون تغییر کدک" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/format_conversion_note"
+            android:textColor="@color/aria_text_dim"
+            android:textSize="10sp" />
+    </LinearLayout>
+</ScrollView>
