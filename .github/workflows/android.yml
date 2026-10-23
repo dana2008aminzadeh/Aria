@@ -1,8 +1,11 @@
 name: Android CI
 
 on:
-  push:
   pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -50,6 +53,15 @@ jobs:
               tail -n 220 gradle.log
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+            # Checks annotations are accessible through the normal GitHub API even when
+            # the separate log-archive host is unavailable to a maintainer's tool.
+            python3 - <<'PY'
+          from pathlib import Path
+          lines = Path('gradle.log').read_text(errors='replace').splitlines()[-100:]
+          text = '\n'.join(lines)
+          text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print('::error::' + text)
+          PY
           fi
           exit "$status"
 
