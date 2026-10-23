@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Aria" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/aria_blue</item>
+        <item name="colorOnPrimary">#0B0F14</item>
+        <item name="colorPrimaryContainer">@color/aria_blue_dark</item>
+        <item name="colorSecondary">@color/aria_green</item>
+        <item name="android:statusBarColor">@color/aria_bg</item>
+        <item name="android:navigationBarColor">@color/aria_bg</item>
+        <item name="android:windowBackground">@color/aria_bg</item>
+    </style>
+
+    <style name="RowTitle">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/aria_text</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">middle</item>
+    </style>
+
+    <style name="RowSub">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/aria_text_dim</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+</resources>
