@@ -26,7 +26,7 @@ import ir.aria.downloader.engine.ExtractorEngine
 import ir.aria.downloader.engine.LinkIngestor
 import ir.aria.downloader.net.UrlExtractor
 import ir.aria.downloader.service.DownloadService
-import ir.aria.downloader.util.Logs
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,6 +40,12 @@ import kotlin.coroutines.resume
  * then probes every media item and asks for its exact format and output before queueing.
  */
 class AddActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_PREFILL = "ir.aria.downloader.extra.PREFILL"
+        const val EXTRA_PLATFORM_HINT = "ir.aria.downloader.extra.PLATFORM_HINT"
+    }
+
 
     private lateinit var binding: ActivityAddBinding
     private lateinit var repo: DownloadRepository
@@ -111,6 +117,10 @@ class AddActivity : AppCompatActivity() {
     }
 
     private fun preloadFromIntent(intent: Intent?) {
+        val prefill = intent?.getStringExtra(EXTRA_PREFILL)
+        if (!prefill.isNullOrBlank()) appendText(prefill)
+        val hint = intent?.getStringExtra(EXTRA_PLATFORM_HINT)
+        if (!hint.isNullOrBlank()) Toast.makeText(this, hint, Toast.LENGTH_SHORT).show()
         when (intent?.action) {
             Intent.ACTION_SEND -> {
                 val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
@@ -154,7 +164,7 @@ class AddActivity : AppCompatActivity() {
                     if (urls.isEmpty()) "" else getString(R.string.links_found, urls.size)
             } catch (t: Throwable) {
                 // The preview is cosmetic: it must never be able to take the screen down.
-                Logs.e(this@AddActivity, "add", "preview failed", t)
+                Log.e("AriaAdd", "preview failed", t)
                 binding.previewText.text = ""
             }
         }
@@ -167,7 +177,7 @@ class AddActivity : AppCompatActivity() {
         binding.startButton.isEnabled = false
         binding.progressText.visibility = View.VISIBLE
         binding.progressText.text = getString(R.string.preparing)
-        Logs.d(this, "add", "add pressed, " + raw.length + " chars")
+        Log.d("AriaAdd", "add pressed, " + raw.length + " chars")
 
         lifecycleScope.launch {
             try {
@@ -176,7 +186,7 @@ class AddActivity : AppCompatActivity() {
                 val report = withContext(Dispatchers.IO) {
                     val links = UrlExtractor.parse(raw)
                     if (links.isEmpty()) return@withContext null
-                    Logs.d(this@AddActivity, "add", "parsed " + links.size + " link(s)")
+                    Log.d("AriaAdd", "parsed " + links.size + " link(s)")
                     val engine = ExtractorEngine.get(this@AddActivity)
                     val ingestor = LinkIngestor(engine)
                     ingestor.ingest(
@@ -184,7 +194,7 @@ class AddActivity : AppCompatActivity() {
                         preset = repo.settings.defaultPreset,
                         chooser = { request -> chooseFormat(request) }
                     ) { status ->
-                        Logs.d(this@AddActivity, "add", "status: " + status)
+                        Log.d("AriaAdd", "status: " + status)
                         runOnUiThread {
                             if (!isFinishing && !isDestroyed) binding.progressText.text = status
                         }
@@ -198,8 +208,8 @@ class AddActivity : AppCompatActivity() {
                 }
 
                 val added = withContext(Dispatchers.IO) { repo.addRequests(report.requests) }
-                Logs.d(
-                    this@AddActivity, "add",
+                Log.d(
+                    "AriaAdd",
                     "queued " + added.size + " of " + report.requests.size +
                         " (warnings=" + report.warnings.size + ")"
                 )
@@ -209,7 +219,7 @@ class AddActivity : AppCompatActivity() {
                 finishBusy()
                 showResult(added.size, report)
             } catch (t: Throwable) {
-                Logs.e(this@AddActivity, "add", "add flow failed", t)
+                Log.e("AriaAdd", "add flow failed", t)
                 finishBusy()
                 showFailure(t)
             }
@@ -234,7 +244,7 @@ class AddActivity : AppCompatActivity() {
                     if (continuation.isActive) continuation.resume(selection)
                 }
             } catch (t: Throwable) {
-                Logs.e(this@AddActivity, "add", "format chooser failed", t)
+                Log.e("AriaAdd", "format chooser failed", t)
                 if (continuation.isActive) continuation.resume(null)
                 null
             }
@@ -272,7 +282,7 @@ class AddActivity : AppCompatActivity() {
     }
 
     private fun showFailure(error: Throwable) {
-        val details = Logs.stack(error)
+        val details = Log.getStackTraceString(error)
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.add_failed_title)
             .setMessage(error.javaClass.simpleName + "\n" + (error.message ?: ""))

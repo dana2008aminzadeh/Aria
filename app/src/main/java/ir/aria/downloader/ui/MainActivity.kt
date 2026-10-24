@@ -13,8 +13,6 @@ import android.os.Environment
 import android.os.StatFs
 import android.view.View
 import android.widget.CheckBox
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,12 +24,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import ir.aria.downloader.BuildConfig
 import ir.aria.downloader.R
 import ir.aria.downloader.data.DownloadRepository
 import ir.aria.downloader.data.FileSaver
-import ir.aria.downloader.engine.ExtractorEngine
-import ir.aria.downloader.util.Logs
 import ir.aria.downloader.databinding.ActivityMainBinding
 import ir.aria.downloader.databinding.DialogDetailsBinding
 import ir.aria.downloader.databinding.DialogRenameBinding
@@ -72,20 +67,17 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         repo = DownloadRepository.get(this)
 
-        setupToolbar()
+        setupHeader()
         setupList()
         setupFilters()
         setupSearch()
         setupSelectionBar()
 
-        binding.fab.setOnClickListener { openAddScreen() }
         binding.emptyAddButton.setOnClickListener { openAddScreen() }
 
+        setupHome()
         observeQueue()
         requestPermissionsIfNeeded()
-        Logs.d(this, "ui", "main screen opened")
-        checkPreviousCrash()
-        checkEngineOnceAfterInstall()
     }
 
     override fun onStart() {
@@ -93,10 +85,6 @@ class MainActivity : AppCompatActivity() {
         ensureServiceRunning()
     }
 
-    override fun onDestroy() {
-        if (isFinishing) Logs.endSession(this)
-        super.onDestroy()
-    }
 
     private fun ensureServiceRunning() {
         val hasQueued = repo.items.value.any { it.status == DownloadStatus.QUEUED }
@@ -110,37 +98,90 @@ class MainActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------------ setup
 
-    private fun setupToolbar() {
-        binding.toolbar.setOnMenuItemClickListener { item ->
+    private fun setupHeader() {
+        binding.headerMenu.setOnClickListener { view -> showHeaderMenu(view) }
+        binding.headerPremium.setOnClickListener { showAbout() }
+    }
+
+    private fun showHeaderMenu(anchor: android.view.View) {
+        val popup = android.widget.PopupMenu(this, anchor)
+        popup.menu.add(0, 1, 0, R.string.settings)
+        popup.menu.add(0, 2, 1, R.string.pause_all)
+        popup.menu.add(0, 3, 2, R.string.resume_all)
+        popup.menu.add(0, 4, 3, R.string.clear_completed)
+        popup.menu.add(0, 5, 4, R.string.about)
+        popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                R.id.action_settings -> {
-                    startActivity(Intent(this, SettingsActivity::class.java)); true
-                }
-                R.id.action_pause_all -> {
+                1 -> { startActivity(Intent(this, SettingsActivity::class.java)); true }
+                2 -> {
                     DownloadService.send(this, DownloadService.ACTION_PAUSE_ALL)
                     Toast.makeText(this, R.string.pause_all, Toast.LENGTH_SHORT).show(); true
                 }
-                R.id.action_resume_all -> {
+                3 -> {
                     DownloadService.send(this, DownloadService.ACTION_RESUME_ALL)
                     Toast.makeText(this, R.string.resume_all, Toast.LENGTH_SHORT).show(); true
                 }
-                R.id.action_clear_completed -> {
-                    confirmClearCompleted(); true
-                }
-                R.id.action_log -> {
-                    showLogDialog(); true
-                }
-                R.id.action_about -> {
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle(R.string.about)
-                        .setMessage(R.string.about_text)
-                        .setPositiveButton(R.string.done, null)
-                        .show()
-                    true
-                }
+                4 -> { confirmClearCompleted(); true }
+                5 -> { showAbout(); true }
                 else -> false
             }
         }
+        popup.show()
+    }
+
+    private fun showAbout() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.about)
+            .setMessage(R.string.about_text)
+            .setPositiveButton(R.string.done, null)
+            .show()
+    }
+
+    private fun setupHome() {
+        binding.quickDownloadButton.setOnClickListener {
+            val text = binding.quickUrlInput.text?.toString()?.trim().orEmpty()
+            if (text.isBlank()) {
+                // Try clipboard first, like the mockup's paste-first flow.
+                val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = manager.primaryClip?.takeIf { it.itemCount > 0 }
+                    ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
+                if (clip.contains("http")) {
+                    openAddScreen(clip)
+                } else {
+                    openAddScreen()
+                }
+            } else {
+                openAddScreen(text)
+            }
+        }
+        binding.groupAddButton.setOnClickListener { openAddScreen() }
+        binding.shortcutDirect.setOnClickListener { openAddScreen(platformHint = "لینک مستقیم را وارد کنید") }
+        binding.shortcutYoutube.setOnClickListener { openAddScreen(platformHint = "لینک یوتیوب را وارد کنید") }
+        binding.shortcutSpotify.setOnClickListener { openAddScreen(platformHint = "لینک اسپاتیفای را وارد کنید") }
+        binding.shortcutInstagram.setOnClickListener { openAddScreen(platformHint = "لینک اینستاگرام را وارد کنید") }
+        binding.shortcutPornhub.setOnClickListener { openAddScreen(platformHint = "لینک Pornhub را وارد کنید") }
+        binding.navHome.setOnClickListener { setFilter(Filter.ALL) }
+        binding.navQueue.setOnClickListener { setFilter(Filter.ACTIVE) }
+        binding.navDownloads.setOnClickListener { setFilter(Filter.COMPLETED) }
+        binding.navAdd.setOnClickListener { openAddScreen() }
+        binding.navProfile.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+    }
+
+    private fun setFilter(newFilter: Filter) {
+        filter = newFilter
+        val chipId = when (newFilter) {
+            Filter.ALL -> R.id.chipAll
+            Filter.ACTIVE -> R.id.chipActive
+            Filter.COMPLETED -> R.id.chipCompleted
+            Filter.PAUSED -> R.id.chipPaused
+            Filter.FAILED -> R.id.chipFailed
+        }
+        binding.filterChips.check(chipId)
+        clearSelection()
+        refreshList()
+        binding.recycler.scrollToPosition(0)
     }
 
     private fun setupList() {
@@ -471,8 +512,12 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun openAddScreen() {
-        addLauncher.launch(Intent(this, AddActivity::class.java))
+    private fun openAddScreen(prefill: String? = null, platformHint: String? = null) {
+        val intent = Intent(this, AddActivity::class.java).apply {
+            if (!prefill.isNullOrBlank()) putExtra(AddActivity.EXTRA_PREFILL, prefill)
+            if (!platformHint.isNullOrBlank()) putExtra(AddActivity.EXTRA_PLATFORM_HINT, platformHint)
+        }
+        addLauncher.launch(intent)
     }
 
     // ------------------------------------------------------------------ permissions
@@ -510,87 +555,6 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
-    }
-
-    // ------------------------------------------------------------------ diagnostics
-
-    /**
-     * Tells the user about the previous run when it did not end normally. Java crashes come with
-     * a stack trace; a native crash (no stack trace at all) is detected through the session flag,
-     * and the on-device log explains what the app was doing.
-     */
-    private fun checkPreviousCrash() {
-        val crash = Logs.pendingCrash(this)
-        val report = crash ?: run {
-            if (!Logs.hadPreviousUncleanSession) return
-            getString(R.string.crash_body) + "\n\n" + Logs.read(this).take(2500)
-        }
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.crash_title) + " • " + BuildConfig.VERSION_NAME)
-            .setMessage(report.take(3000))
-            .setPositiveButton(R.string.crash_send) { _, _ ->
-                copyToClipboard(if (crash != null) crash else Logs.read(this))
-                Logs.acknowledgeCrash(this)
-            }
-            .setNegativeButton(R.string.crash_ignore) { _, _ -> Logs.acknowledgeCrash(this) }
-            .create()
-        dialog.show()
-    }
-
-    /**
-     * Runs the extraction engine once after installation, in the background. It warms Python up
-     * and makes sure the very first real download cannot be the first thing that touches it;
-     * the result (good or bad) is written to the on-device log.
-     */
-    private fun checkEngineOnceAfterInstall() {
-        val prefs = getSharedPreferences("aria_settings", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("engine_checked", false)) return
-        // set before the call: if the engine takes the process down, we must not retry at every
-        // launch and turn the app into an endless crash loop
-        prefs.edit().putBoolean("engine_checked", true).apply()
-        lifecycleScope.launch {
-            val result = runCatching { ExtractorEngine.get(this@MainActivity).selfTest() }
-                .getOrElse { "selfTest exception: " + it.javaClass.simpleName }
-            Logs.d(this@MainActivity, "engine", "first launch check: " + result.replace("\n", " | "))
-        }
-    }
-
-    private fun showLogDialog() {
-        val text = Logs.read(this)
-        val scroll = ScrollView(this)
-        val view = TextView(this).apply {
-            this.text = if (text.isBlank()) getString(R.string.log_empty) else text
-            textSize = 10f
-            typeface = android.graphics.Typeface.MONOSPACE
-            setTextIsSelectable(true)
-            val pad = (12 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad, pad, pad)
-        }
-        scroll.addView(view)
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.log_report) + " • " + BuildConfig.VERSION_NAME)
-            .setView(scroll)
-            .setPositiveButton(R.string.copy) { _, _ -> copyToClipboard(view.text.toString()) }
-            .setNeutralButton(R.string.engine_test) { _, _ -> runEngineTest() }
-            .setNegativeButton(R.string.close, null)
-            .show()
-    }
-
-    private fun runEngineTest() {
-        Toast.makeText(this, R.string.engine_test_running, Toast.LENGTH_SHORT).show()
-        lifecycleScope.launch {
-            val result = try {
-                ExtractorEngine.get(this@MainActivity).selfTest()
-            } catch (t: Throwable) {
-                "موتور اجرا نشد: " + t.javaClass.simpleName
-            }
-            MaterialAlertDialogBuilder(this@MainActivity)
-                .setTitle(R.string.engine_test)
-                .setMessage(result)
-                .setPositiveButton(R.string.copy) { _, _ -> copyToClipboard(result) }
-                .setNegativeButton(R.string.close, null)
-                .show()
-        }
     }
 
     private fun copyToClipboard(text: String) {

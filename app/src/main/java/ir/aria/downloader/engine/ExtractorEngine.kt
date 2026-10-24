@@ -5,7 +5,7 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import ir.aria.downloader.data.Settings
-import ir.aria.downloader.util.Logs
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -155,14 +155,14 @@ class ExtractorEngine private constructor(
         module?.let { return it }
         synchronized(this) {
             module?.let { return it }
-            Logs.d(appContext, "engine", "starting python runtime")
+            Log.d("AriaEngine", "starting python runtime")
             if (!Python.isStarted()) {
                 Python.start(AndroidPlatform(appContext))
             }
-            Logs.d(appContext, "engine", "python started, loading aria_dl")
+            Log.d("AriaEngine", "python started, loading aria_dl")
             val loaded = Python.getInstance().getModule("aria_dl")
             module = loaded
-            Logs.d(appContext, "engine", "aria_dl loaded")
+            Log.d("AriaEngine", "aria_dl loaded")
             return loaded
         }
     }
@@ -174,14 +174,14 @@ class ExtractorEngine private constructor(
     suspend fun selfTest(): String = withContext(Dispatchers.IO) {
         try {
             val raw = module().callAttr("engine_info").toString()
-            Logs.d(appContext, "engine", "selfTest ok: $raw")
+            Log.d("AriaEngine", "selfTest ok: $raw")
             val json = JSONObject(raw)
             "موتور سالم است.\n" +
                 "موتور: " + json.optString("engine", "?") + "\n" +
                 "yt-dlp: " + json.optString("yt_dlp", "?") + "\n" +
                 "پایتون: " + json.optString("python", "?")
         } catch (t: Throwable) {
-            Logs.e(appContext, "engine", "selfTest failed", t)
+            Log.e("AriaEngine", "selfTest failed", t)
             "موتور اجرا نشد: " + t.javaClass.simpleName + "\n" + (t.message ?: "")
         }
     }
@@ -206,12 +206,12 @@ class ExtractorEngine private constructor(
             val raw = module().callAttr("engine_info").toString()
             val json = JSONObject(raw)
             EngineInfo(
-                engine = json.optString("engine", "2.2.2"),
+                engine = json.optString("engine", "3.0.0"),
                 ytDlp = json.optString("yt_dlp", "?"),
                 python = json.optString("python", "?")
             )
         } catch (e: Throwable) {
-            EngineInfo("2.2.2", "unavailable", e.javaClass.simpleName)
+            EngineInfo("3.0.0", "unavailable", e.javaClass.simpleName)
         }
     }
 

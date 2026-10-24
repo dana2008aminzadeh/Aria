@@ -143,14 +143,24 @@
     <string name="added_title">لینک‌ها اضافه شدند</string>
     <string name="nothing_added">چیزی اضافه نشد</string>
     <string name="add_failed_title">خطا در بررسی لینک</string>
-    <string name="log_report">گزارش خطا / لاگ</string>
-    <string name="log_empty">هنوز خطایی ثبت نشده است.</string>
-    <string name="engine_test">تست موتور</string>
-    <string name="engine_test_running">در حال تست موتور…</string>
-    <string name="crash_title">برنامه دفعهٔ قبل بسته شد</string>
-    <string name="crash_body">گزارش خطا ذخیره شد. با فرستادن آن می‌توانیم مشکل را دقیق پیدا کنیم.</string>
-    <string name="crash_send">کپی گزارش برای ارسال</string>
-    <string name="crash_ignore">بعداً</string>
-    <string name="test_video">تست دانلود ویدیو</string>
-    <string name="test_video_running">در حال تست دانلود یوتیوب…</string>
+
+    <!-- Aria 3.0 home -->
+    <string name="hero_greeting">سلام! 👋</string>
+    <string name="hero_title">هر چیزی رو دانلود کن!</string>
+    <string name="hero_subtitle">از هر پلتفرمی، با کیفیت بالا و سریع</string>
+    <string name="direct_download">دانلود با لینک مستقیم</string>
+    <string name="quick_url_hint">لینک را اینجا وارد یا پیست کنید…</string>
+    <string name="download_cta">دانلود</string>
+    <string name="shortcuts">میانبرها</string>
+    <string name="shortcut_direct">سایر لینک‌ها</string>
+    <string name="group_download">دانلود گروهی</string>
+    <string name="group_download_desc">تا ۳۰ لینک را وارد کنید، ما بقیه‌اش رو انجام می‌دیم!</string>
+    <string name="group_add">+ افزودن لینک‌های متعدد</string>
+    <string name="queue_title">صف دانلود</string>
+    <string name="recent_links">لینک‌های اخیر</string>
+    <string name="see_all">مشاهده همه</string>
+    <string name="nav_home">خانه</string>
+    <string name="nav_queue">صف دانلود</string>
+    <string name="nav_downloads">دانلودها</string>
+    <string name="nav_profile">پروفایل</string>
 </resources>
