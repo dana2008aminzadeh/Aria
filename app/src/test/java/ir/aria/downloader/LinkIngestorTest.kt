@@ -17,7 +17,8 @@ class LinkIngestorTest {
 
     private class FakeEngine(
         private val probes: Map<String, ExtractorEngine.Probe> = emptyMap(),
-        private val searchResults: Map<String, List<ExtractorEngine.SearchHit>> = emptyMap()
+        private val searchResults: Map<String, List<ExtractorEngine.SearchHit>> = emptyMap(),
+        private val searchErrors: Map<String, String> = emptyMap()
     ) : ExtractorApi {
         var probeCalls = 0
         var searchCalls = 0
@@ -30,9 +31,11 @@ class LinkIngestorTest {
         override suspend fun resolve(url: String, preset: String) =
             ExtractorEngine.Plan(false, error = "not used")
 
-        override suspend fun search(query: String, limit: Int): List<ExtractorEngine.SearchHit> {
+        override suspend fun search(query: String, limit: Int): ExtractorEngine.SearchResponse {
             searchCalls++
-            return searchResults[query] ?: emptyList()
+            return ExtractorEngine.SearchResponse(
+                searchResults[query].orEmpty(), searchErrors[query]
+            )
         }
 
         override suspend fun download(
@@ -260,6 +263,26 @@ class LinkIngestorTest {
     }
 
     @Test
+    fun spotifySearchFailureIsNotHiddenBehindGenericNotFoundWarning() = runBlocking {
+        val spotifyUrl = "https://open.spotify.com/track/search-error"
+        val query = "Artist Song audio"
+        val precise = SpotifyResolver.preciseQuery("Song", "Artist")
+        val engine = FakeEngine(searchErrors = mapOf(
+            query to "یوتیوب درخواست را مسدود کرد (بررسی ربات)",
+            precise to "یوتیوب درخواست را مسدود کرد (بررسی ربات)"
+        ))
+        val collection = SpotifyResolver.Collection(
+            true, "Track", listOf(SpotifyResolver.Track("Song", "Artist", query))
+        )
+
+        val report = LinkIngestor(engine, spotifyLookup = { collection })
+            .ingest(listOf(spotifyUrl), preset = "best")
+
+        assertTrue(report.requests.isEmpty())
+        assertTrue(report.warnings.any { it.contains("خطای جست‌وجو") && it.contains("بررسی ربات") })
+    }
+
+    @Test
     fun interactiveSpotifyUsesAudioOnlyChooserAndSelectedExtension() = runBlocking {
         val spotifyUrl = "https://open.spotify.com/track/choose"
         val hitUrl = "https://youtu.be/audio-choice"
@@ -332,7 +355,8 @@ class LinkIngestorTest {
         val exploding = object : ExtractorApi {
             override suspend fun probe(url: String): ExtractorEngine.Probe = throw IllegalStateException("native crash")
             override suspend fun resolve(url: String, preset: String) = ExtractorEngine.Plan(false, error = "x")
-            override suspend fun search(query: String, limit: Int) = emptyList<ExtractorEngine.SearchHit>()
+            override suspend fun search(query: String, limit: Int) =
+                ExtractorEngine.SearchResponse(emptyList())
             override suspend fun download(
                 url: String, outDir: File, formatId: String?, preset: String,
                 shouldCancel: () -> Boolean, onProgress: (ExtractorEngine.Progress) -> Unit

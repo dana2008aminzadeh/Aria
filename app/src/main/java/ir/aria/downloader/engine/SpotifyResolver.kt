@@ -18,7 +18,8 @@ import java.net.URLEncoder
 class SpotifyResolver(
     private val userAgent: String = DEFAULT_UA,
     private val connectTimeoutMs: Int = 15_000,
-    private val readTimeoutMs: Int = 20_000
+    private val readTimeoutMs: Int = 20_000,
+    private val fetcher: ((String) -> String)? = null
 ) {
 
     data class Track(
@@ -68,6 +69,52 @@ class SpotifyResolver(
 
         fun durationSeconds(durationMs: Long): Long? =
             if (durationMs > 0) (durationMs + 500L) / 1000L else null
+
+        private fun findEntity(value: Any?, depth: Int = 0): JSONObject? {
+            if (value == null || depth > 16) return null
+            when (value) {
+                is JSONObject -> {
+                    val type = value.optString("type")
+                    val hasName = value.optString("title").isNotBlank() ||
+                        value.optString("name").isNotBlank()
+                    val isTrack = type == "track" && hasName
+                    val isCollection = type in setOf("album", "playlist") && hasName &&
+                        value.optJSONArray("trackList") != null
+                    if (isTrack || isCollection) return value
+                    val keys = value.keys()
+                    while (keys.hasNext()) {
+                        findEntity(value.opt(keys.next()), depth + 1)?.let { return it }
+                    }
+                }
+                is org.json.JSONArray -> {
+                    for (index in 0 until value.length()) {
+                        findEntity(value.opt(index), depth + 1)?.let { return it }
+                    }
+                }
+            }
+            return null
+        }
+
+        private fun artistsOf(item: JSONObject): String {
+            val subtitle = item.optString("subtitle")
+            if (subtitle.isNotBlank()) return subtitle
+            val array = item.optJSONArray("artists") ?: return ""
+            return (0 until array.length()).mapNotNull { index ->
+                when (val artist = array.opt(index)) {
+                    is JSONObject -> artist.optString("name").takeIf { it.isNotBlank() }
+                    is String -> artist.takeIf { it.isNotBlank() }
+                    else -> null
+                }
+            }.joinToString(", ")
+        }
+
+        private fun durationOf(item: JSONObject): Long? {
+            for (key in listOf("duration", "durationMs", "duration_ms")) {
+                if (!item.has(key)) continue
+                durationSeconds(item.optLong(key, -1L))?.let { return it }
+            }
+            return null
+        }
     }
 
     /** Parses the embedded JSON of a spotify embed page. Pure function, unit tested. */
@@ -76,12 +123,17 @@ class SpotifyResolver(
             ?: return Collection(false, "", emptyList(), "صفحهٔ اسپاتیفای قابل خواندن نبود")
         return try {
             val root = JSONObject(match.groupValues[1])
-            val entity = root
+            val directEntity = root
                 .optJSONObject("props")
                 ?.optJSONObject("pageProps")
                 ?.optJSONObject("state")
                 ?.optJSONObject("data")
                 ?.optJSONObject("entity")
+            val entity = directEntity?.takeIf {
+                (it.optString("type") == "track" &&
+                    (it.optString("title").isNotBlank() || it.optString("name").isNotBlank())) ||
+                    it.optJSONArray("trackList") != null
+            } ?: findEntity(root)
                 ?: return Collection(false, "", emptyList(), "ساختار صفحهٔ اسپاتیفای تغییر کرده است")
 
             val name = entity.optString("title").ifBlank {
@@ -93,36 +145,24 @@ class SpotifyResolver(
             if (list != null) {
                 for (i in 0 until list.length()) {
                     val item = list.optJSONObject(i) ?: continue
-                    val title = item.optString("title")
+                    val title = item.optString("title").ifBlank { item.optString("name") }
                     if (title.isBlank()) continue
-                    val subtitle = item.optString("subtitle").ifBlank {
-                        item.optJSONArray("artists")?.let { array ->
-                            (0 until array.length()).mapNotNull { idx ->
-                                array.optJSONObject(idx)?.optString("name")?.takeIf { it.isNotBlank() }
-                            }.joinToString(", ")
-                        }.orEmpty()
-                    }
+                    val artists = artistsOf(item)
                     tracks.add(Track(
                         title = title,
-                        artists = subtitle,
-                        query = buildQuery(title, subtitle),
-                        durationSec = durationSeconds(item.optLong("duration", -1L))
+                        artists = artists,
+                        query = buildQuery(title, artists),
+                        durationSec = durationOf(item)
                     ))
                 }
             }
             if (tracks.isEmpty() && entity.optString("type") == "track" && name.isNotBlank()) {
-                val subtitle = entity.optString("subtitle").ifBlank {
-                    entity.optJSONArray("artists")?.let { array ->
-                        (0 until array.length()).mapNotNull { idx ->
-                            array.optJSONObject(idx)?.optString("name")?.takeIf { it.isNotBlank() }
-                        }.joinToString(", ")
-                    }.orEmpty()
-                }
+                val artists = artistsOf(entity)
                 tracks.add(Track(
                     title = name,
-                    artists = subtitle,
-                    query = buildQuery(name, subtitle),
-                    durationSec = durationSeconds(entity.optLong("duration", -1L))
+                    artists = artists,
+                    query = buildQuery(name, artists),
+                    durationSec = durationOf(entity)
                 ))
             }
             if (tracks.isEmpty()) {
@@ -153,12 +193,22 @@ class SpotifyResolver(
             )
         }
         val embedUrl = "https://open.spotify.com/embed/$type/$id"
-        val html = try {
-            httpGet(embedUrl)
+        val parsed = try {
+            parseEmbed(httpGet(embedUrl))
         } catch (e: Exception) {
-            return Collection(false, "", emptyList(), "اتصال به اسپاتیفای ناموفق بود")
+            null
         }
-        return parseEmbed(html)
+        if (parsed?.ok == true) return parsed
+
+        // oEmbed cannot provide album/playlist entries or duration, but it is a useful
+        // independent public metadata path for one track when the embed layout/API changes.
+        if (type == "track") {
+            val fallback = resolveViaOEmbed(url)
+            if (fallback != null) {
+                return Collection(true, fallback.title, listOf(fallback))
+            }
+        }
+        return parsed ?: Collection(false, "", emptyList(), "اتصال به اسپاتیفای ناموفق بود")
     }
 
     /** oEmbed fallback (title + author) used when the embed page is unavailable. */
@@ -175,6 +225,7 @@ class SpotifyResolver(
     }
 
     private fun httpGet(url: String): String {
+        fetcher?.let { return it(url) }
         var current = url
         var hops = 0
         while (hops++ < 5) {

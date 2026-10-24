@@ -5,10 +5,14 @@ Run with:
 """
 
 import importlib.util
+import io
 import json
 from pathlib import Path
 import unittest
 from unittest import mock
+
+from yt_dlp.networking import Request
+from yt_dlp.networking.impersonate import ImpersonateTarget
 
 
 MODULE_PATH = Path(__file__).parents[2] / "main" / "python" / "aria_dl.py"
@@ -199,6 +203,105 @@ class TransferOptionsTest(unittest.TestCase):
             {"fragment_concurrency": 99})["concurrent_fragment_downloads"])
         self.assertEqual(aria_dl.DEFAULT_FRAGMENT_CONCURRENCY, aria_dl._base_opts(
             {"fragment_concurrency": "invalid"})["concurrent_fragment_downloads"])
+
+    def test_no_artificial_download_rate_limit_is_configured(self):
+        opts = aria_dl._base_opts({})
+        self.assertNotIn("ratelimit", opts)
+        self.assertNotIn("throttledratelimit", opts)
+
+
+class AndroidNetworkCompatibilityTest(unittest.TestCase):
+    def test_impersonation_marked_request_can_use_standard_android_https(self):
+        with aria_dl._AriaYoutubeDL(aria_dl._base_opts({})) as ydl:
+            # Do not pretend that urllib supplies a browser TLS fingerprint. If curl-cffi
+            # is available it remains a separate, preferred handler.
+            self.assertFalse(ydl._impersonate_target_available(ImpersonateTarget()))
+            response = ydl.urlopen(Request(
+                "data:text/plain,aria",
+                extensions={"impersonate": ImpersonateTarget()},
+            ))
+            try:
+                self.assertEqual(b"aria", response.read())
+            finally:
+                response.close()
+
+
+class InstagramPublicFallbackTest(unittest.TestCase):
+    def test_public_meta_video_is_parsed_and_html_entities_are_decoded(self):
+        page = """
+            <html><head>
+            <meta content="A public reel" property="og:title">
+            <meta property="og:video:secure_url"
+                  content="https://cdn.example.com/reel.mp4?x=1&amp;y=2">
+            <meta property="og:video:width" content="720">
+            <meta property="og:video:height" content="1280">
+            </head></html>
+        """
+        info = aria_dl._parse_instagram_public_embed(
+            page, "abc", "https://www.instagram.com/reel/abc/")
+
+        self.assertEqual("A public reel", info["title"])
+        self.assertEqual("ig-public", info["formats"][0]["format_id"])
+        self.assertEqual("https://cdn.example.com/reel.mp4?x=1&y=2",
+                         info["formats"][0]["url"])
+        rows = aria_dl._usable_rows(info)
+        self.assertTrue(rows[0]["progressive"])
+        self.assertEqual(1280, rows[0]["height"])
+
+    def test_video_versions_keep_quality_and_stable_format_ids(self):
+        page = r'''
+            <script>{"video_versions":[
+              {"type":101,"width":640,"height":360,
+               "url":"https:\/\/cdn.example.com\/low.mp4?a=1\u0026b=2"},
+              {"type":102,"width":720,"height":1280,
+               "url":"https:\/\/cdn.example.com\/high.mp4"}
+            ]}</script>
+        '''
+        info = aria_dl._parse_instagram_public_embed(
+            page, "abc", "https://www.instagram.com/reel/abc/")
+
+        self.assertEqual(["102", "101"], [f["format_id"] for f in info["formats"]])
+        self.assertEqual("https://cdn.example.com/low.mp4?a=1&b=2",
+                         info["formats"][1]["url"])
+        selected, error = aria_dl._choose_plan(aria_dl._usable_rows(info), "best", {
+            "selected_format_id": "102", "output_kind": "video",
+        })
+        self.assertIsNone(error)
+        self.assertEqual("102", selected["format_id"])
+
+    def test_failed_normal_extraction_uses_public_embed_for_probe_and_download(self):
+        page = b'''<meta property="og:video" content="https://cdn.example.com/reel.mp4">'''
+        response = mock.Mock()
+        response.url = "https://www.instagram.com/p/abc/embed/captioned/"
+        response.read.return_value = page
+        ydl = mock.Mock()
+        ydl.extract_info.side_effect = RuntimeError("Instagram sent an empty media response")
+        ydl.urlopen.return_value = response
+        ydl.process_ie_result.side_effect = lambda info, download: {**info, "downloaded": download}
+
+        for download in (False, True):
+            info = aria_dl._extract_info(
+                ydl, "https://www.instagram.com/reel/abc/?igsh=share", download)
+            self.assertEqual(download, info["downloaded"])
+            self.assertEqual("ig-public", info["formats"][0]["format_id"])
+        response.close.assert_called()
+
+    def test_cancellation_never_starts_another_network_request(self):
+        ydl = mock.Mock()
+        ydl.extract_info.side_effect = aria_dl._Cancelled()
+        with self.assertRaises(aria_dl._Cancelled):
+            aria_dl._extract_info(ydl, "https://www.instagram.com/reel/abc/", True)
+        ydl.urlopen.assert_not_called()
+
+    def test_share_tokens_audio_pages_and_other_hosts_do_not_trigger_fallback(self):
+        self.assertIsNone(aria_dl._instagram_shortcode(
+            "https://www.instagram.com/share/reel/token"))
+        self.assertIsNone(aria_dl._instagram_shortcode(
+            "https://www.instagram.com/reels/audio/123"))
+        self.assertIsNone(aria_dl._instagram_shortcode(
+            "https://example.com/reel/abc"))
+        self.assertEqual("abc", aria_dl._instagram_shortcode(
+            "https://instagr.am/reel/abc/?igsh=share"))
 
 
 class NetworkErrorTest(unittest.TestCase):

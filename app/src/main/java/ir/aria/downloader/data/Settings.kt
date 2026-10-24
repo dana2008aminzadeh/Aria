@@ -21,7 +21,7 @@ class Settings(context: Context) {
         const val KEY_PROXY_URL = "proxy_url"
         const val DEFAULT_CONCURRENCY = 3
         const val MAX_CONCURRENCY = 10
-        const val DEFAULT_FRAGMENT_CONCURRENCY = 4
+        const val DEFAULT_FRAGMENT_CONCURRENCY = 6
         const val MAX_FRAGMENT_CONCURRENCY = 8
     }
 
@@ -53,6 +53,15 @@ class Settings(context: Context) {
         get() = prefs.getString(KEY_USER_AGENT, HttpDownloader.DEFAULT_USER_AGENT)
             ?: HttpDownloader.DEFAULT_USER_AGENT
         set(value) = prefs.edit().putString(KEY_USER_AGENT, value).apply()
+
+    /**
+     * yt-dlp has current browser headers for each extractor. Do not replace them with the
+     * native downloader's old Android UA unless the user explicitly supplied a custom one.
+     */
+    val mediaUserAgentOverride: String
+        get() = userAgent.trim().takeIf {
+            it.isNotEmpty() && it != HttpDownloader.DEFAULT_USER_AGENT
+        }.orEmpty()
 
     /** Quality preset used only as a legacy/failure fallback; new items get exact choices. */
     var defaultPreset: String
