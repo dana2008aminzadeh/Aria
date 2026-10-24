@@ -57,6 +57,9 @@ class SpotifyResolverTest {
         assertEquals("Rick Astley", track.artists)
         assertTrue(track.query.contains("Rick Astley"))
         assertTrue(track.query.contains("Never Gonna Give You Up"))
+        assertEquals(214L, track.durationSec)
+        assertEquals(213L, SpotifyResolver.durationSeconds(213200L))
+        assertEquals(null, SpotifyResolver.durationSeconds(0L))
     }
 
     @Test
@@ -92,6 +95,8 @@ class SpotifyResolverTest {
         assertEquals("Artist Song Name audio", plain)
         val noArtist = SpotifyResolver.buildQuery("Song", "")
         assertEquals("Song audio", noArtist)
+        assertEquals("Artist With You audio", SpotifyResolver.buildQuery("With You", "Artist"))
+        assertEquals("AC/DC Song audio", SpotifyResolver.buildQuery("Song", "AC/DC"))
     }
 
     @Test

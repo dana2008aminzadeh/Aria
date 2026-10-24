@@ -241,6 +241,25 @@ class LinkIngestorTest {
     }
 
     @Test
+    fun uncertainSpotifyMatchIsSkippedInsteadOfDownloadingDifferentSong() = runBlocking {
+        val spotifyUrl = "https://open.spotify.com/track/uncertain"
+        val query = "Artist Song audio"
+        val engine = FakeEngine(searchResults = mapOf(query to listOf(
+            ExtractorEngine.SearchHit("Completely Different", "https://youtu.be/wrong", 30, "Other")
+        )))
+        val collection = SpotifyResolver.Collection(
+            true, "Track", listOf(SpotifyResolver.Track("Song", "Artist", query))
+        )
+
+        val report = LinkIngestor(engine, spotifyLookup = { collection })
+            .ingest(listOf(spotifyUrl), preset = "best")
+
+        assertTrue(report.requests.isEmpty())
+        assertTrue(report.warnings.any { it.contains("مطمئن") })
+        assertEquals(2, engine.searchCalls)
+    }
+
+    @Test
     fun interactiveSpotifyUsesAudioOnlyChooserAndSelectedExtension() = runBlocking {
         val spotifyUrl = "https://open.spotify.com/track/choose"
         val hitUrl = "https://youtu.be/audio-choice"
@@ -252,7 +271,7 @@ class LinkIngestorTest {
                 )
             )),
             searchResults = mapOf(query to listOf(
-                ExtractorEngine.SearchHit("Source", hitUrl, 30, "Artist")
+                ExtractorEngine.SearchHit("Song", hitUrl, 30, "Artist")
             ))
         )
         val collection = SpotifyResolver.Collection(
