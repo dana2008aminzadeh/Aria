@@ -13,10 +13,10 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/aria_surface"
+        android:background="@color/aria_primary"
         app:navigationIcon="@drawable/ic_close"
         app:title="@string/settings"
-        app:titleTextColor="@color/aria_text" />
+        app:titleTextColor="#FFFFFF" />
 
     <ScrollView
         android:layout_width="match_parent"

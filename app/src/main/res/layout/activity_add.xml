@@ -13,10 +13,10 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/aria_surface"
+        android:background="@color/aria_primary"
         app:navigationIcon="@drawable/ic_close"
         app:title="@string/add_downloads"
-        app:titleTextColor="@color/aria_text" />
+        app:titleTextColor="#FFFFFF" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -156,5 +156,5 @@
         android:text="@string/start_download"
         android:textSize="15sp"
         app:icon="@drawable/ic_download"
-        app:iconTint="#0B0F14" />
+        app:iconTint="#FFFFFF" />
 </LinearLayout>

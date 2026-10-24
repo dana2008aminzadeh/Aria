@@ -49,6 +49,8 @@ class DownloadAdapter(
         fun bind(item: DownloadItem) {
             val context = binding.root.context
             binding.title.text = item.fileName
+            binding.percentText.text = if (item.status == DownloadStatus.COMPLETED) "100%" else item.progressPercent.toString() + "%"
+            binding.percentText.visibility = if (item.status == DownloadStatus.QUEUED || item.status == DownloadStatus.CANCELED) View.GONE else View.VISIBLE
             bindSubtitle(item)
             bindProgress(item)
             bindAction(item)

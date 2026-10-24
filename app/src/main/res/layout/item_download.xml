@@ -5,12 +5,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="6dp"
+    android:layout_marginBottom="8dp"
     android:layoutDirection="rtl"
     app:cardBackgroundColor="@color/aria_surface"
-    app:cardCornerRadius="14dp"
+    app:cardCornerRadius="18dp"
     app:cardElevation="0dp"
-    app:strokeWidth="0dp">
+    app:strokeColor="#FFE9D2"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,17 +24,17 @@
         android:paddingBottom="10dp">
 
         <FrameLayout
-            android:layout_width="42dp"
-            android:layout_height="42dp">
+            android:layout_width="52dp"
+            android:layout_height="52dp">
 
             <TextView
                 android:id="@+id/typeIcon"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:background="@drawable/bg_icon"
                 android:gravity="center"
                 android:text="📄"
-                android:textSize="19sp" />
+                android:textSize="22sp" />
 
             <TextView
                 android:id="@+id/engineBadge"
@@ -46,7 +47,7 @@
                 android:paddingTop="1dp"
                 android:paddingBottom="1dp"
                 android:text="@string/media_badge"
-                android:textColor="@color/aria_blue"
+                android:textColor="@color/aria_primary_dark"
                 android:textSize="8sp"
                 android:visibility="gone" />
         </FrameLayout>
@@ -78,26 +79,37 @@
                 android:id="@+id/progress"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
-                android:layout_height="4dp"
+                android:layout_height="5dp"
                 android:layout_marginTop="6dp"
                 android:max="100"
                 android:progressBackgroundTint="@color/aria_surface2"
-                android:progressTint="@color/aria_blue" />
+                android:progressTint="@color/aria_primary" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/percentText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:textColor="@color/aria_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            tools:text="42%" />
 
         <ImageButton
             android:id="@+id/actionButton"
             android:layout_width="42dp"
             android:layout_height="42dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_circle_orange"
             android:contentDescription="@string/pause"
+            android:padding="8dp"
             android:src="@drawable/ic_pause" />
 
         <CheckBox
             android:id="@+id/checkBox"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:buttonTint="@color/aria_blue"
+            android:buttonTint="@color/aria_primary"
             android:clickable="false"
             android:focusable="false"
             android:visibility="gone" />

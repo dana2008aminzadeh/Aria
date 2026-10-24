@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="aria_blue">#4F8CFF</color>
-    <color name="aria_blue_dark">#2E5CB8</color>
-    <color name="aria_bg">#0E1116</color>
-    <color name="aria_surface">#161B22</color>
-    <color name="aria_surface2">#1E252E</color>
-    <color name="aria_text">#E6EDF3</color>
-    <color name="aria_text_dim">#8B98A8</color>
-    <color name="aria_green">#3FB950</color>
-    <color name="aria_red">#F85149</color>
-    <color name="aria_orange">#D29922</color>
+    <!-- Aria 3.0 — warm light identity (orange / cream), matching the new UI mockups. -->
+    <color name="aria_primary">#FF7A00</color>
+    <color name="aria_primary_dark">#E85D00</color>
+    <color name="aria_primary_light">#FFB35C</color>
+    <color name="aria_hero_end">#FF9E2C</color>
+    <color name="aria_bg">#FFF7EE</color>
+    <color name="aria_surface">#FFFFFF</color>
+    <color name="aria_surface2">#FFF0DF</color>
+    <color name="aria_text">#221A12</color>
+    <color name="aria_text_dim">#8A7A68</color>
+    <color name="aria_green">#1DB954</color>
+    <color name="aria_red">#E53935</color>
+    <color name="aria_orange">#FF7A00</color>
+    <!-- Legacy names kept so every existing screen picks up the new palette. -->
+    <color name="aria_blue">#FF7A00</color>
+    <color name="aria_blue_dark">#E85D00</color>
+    <color name="aria_youtube">#FF0000</color>
+    <color name="aria_spotify">#1DB954</color>
+    <color name="aria_instagram">#E1306C</color>
+    <color name="aria_pornhub">#FF9000</color>
 </resources>

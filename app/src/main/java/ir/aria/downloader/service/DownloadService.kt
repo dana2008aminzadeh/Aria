@@ -31,7 +31,7 @@ import ir.aria.downloader.net.MimeTypes
 import ir.aria.downloader.net.Mp4Remuxer
 import ir.aria.downloader.ui.MainActivity
 import ir.aria.downloader.util.Formats
-import ir.aria.downloader.util.Logs
+import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +83,7 @@ class DownloadService : Service() {
                 ContextCompat.startForegroundService(context, intent)
             } catch (e: Exception) {
                 // Background-start restrictions: the queue is persisted and resumes later.
-                Logs.e(context, "service", "cannot start foreground service ($action)", e)
+                Log.e("AriaService", "cannot start foreground service", e)
             }
         }
     }
@@ -94,7 +94,7 @@ class DownloadService : Service() {
     private lateinit var repo: DownloadRepository
     private lateinit var settings: Settings
     private val crashGuard = CoroutineExceptionHandler { _, error ->
-        Logs.e(this, "service", "unhandled coroutine error", error)
+        Log.e("AriaService", "unhandled coroutine error", error)
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + crashGuard)
     private val jobs = ConcurrentHashMap<Long, Job>()
@@ -180,7 +180,7 @@ class DownloadService : Service() {
                 } catch (t: Throwable) {
                     // ANY unexpected failure (python, storage, mp4parser, OEM quirks) is reported
                     // on the item instead of taking the whole app down.
-                    Logs.e(this@DownloadService, "service", "item " + item.id + " failed", t)
+                    Log.e("AriaService", "item " + item.id + " failed", t)
                     runCatching {
                         repo.update(item.id, persist = true) {
                             it.copy(
@@ -208,7 +208,7 @@ class DownloadService : Service() {
         // The job may have been launched a moment before the user pressed pause/delete:
         // never resurrect an entry that is no longer queued.
         if (item.status != DownloadStatus.QUEUED) return
-        Logs.d(this, "service", "start item " + id + " (" + item.engine + ", preset=" + item.preset + ")")
+        Log.d("AriaService", "start item " + id + " (" + item.engine + ", preset=" + item.preset + ")")
         repo.update(id, persist = true) {
             it.copy(status = DownloadStatus.RUNNING, speedBps = 0, errorMessage = null)
         }
@@ -352,15 +352,15 @@ class DownloadService : Service() {
         }
 
         val selection = startItem.exactSelection()
-        Logs.d(this, "media", "resolve " + startItem.url + " preset=" + startItem.preset +
+        Log.d("AriaService", "resolve " + startItem.url + " preset=" + startItem.preset +
             " exact=" + (selection?.label ?: "legacy"))
         val plan = engine.resolve(startItem.url, startItem.preset, selection)
         if (!plan.ok) {
-            Logs.e(this, "media", "resolve failed: " + plan.error)
+            Log.e("AriaService", "resolve failed: " + plan.error)
             failItem(id, plan.error ?: getString(R.string.download_failed))
             return
         }
-        Logs.d(this, "media", "plan mode=" + plan.mode + " v=" + plan.videoId + " a=" + plan.audioId + " f=" + plan.formatId)
+        Log.d("AriaService", "plan mode=" + plan.mode + " v=" + plan.videoId + " a=" + plan.audioId + " f=" + plan.formatId)
         if (shouldCancel()) {
             repo.update(id, persist = true) { it.copy(status = DownloadStatus.PAUSED, speedBps = 0) }
             return
@@ -425,7 +425,7 @@ class DownloadService : Service() {
                 } else null
                 fast?.file ?: MediaProcessor.merge(videoFile, audioFile, merged)
             } catch (e: Exception) {
-                Logs.e(this, "media", "merge/transcode failed for item $id", e)
+                Log.e("AriaService", "merge/transcode failed for item $id", e)
                 null
             }
             if (processed == null) {
@@ -467,7 +467,7 @@ class DownloadService : Service() {
                     else -> source
                 }
             } catch (e: Exception) {
-                Logs.e(this, "media", "output processing failed for item $id", e)
+                Log.e("AriaService", "output processing failed for item $id", e)
                 failItem(id, getString(R.string.media_processing_failed))
                 return
             }
@@ -899,7 +899,7 @@ class DownloadService : Service() {
                 startForeground(FOREGROUND_ID, notification)
             }
         } catch (typedError: Exception) {
-            Logs.e(this, "service", "startForeground(dataSync) failed, retrying untyped", typedError)
+            Log.e("AriaService", "startForeground(dataSync) failed, retrying untyped", typedError)
             try {
                 // Some Android 14+ builds refuse the dataSync type for sideloaded apps; a plain
                 // foreground notification still lets the download run.
@@ -917,7 +917,7 @@ class DownloadService : Service() {
         // If we stay alive after a failed startForeground() the system kills the whole app
         // with "did not start in time". Stopping ourselves keeps the queue safe on disk and
         // the app usable; the next start retries.
-        Logs.e(this, "service", "startForeground failed", e)
+        Log.e("AriaService", "startForeground failed", e)
         foregroundShown = false
         runCatching { stopSelf() }
     }
@@ -943,7 +943,7 @@ class DownloadService : Service() {
                 val now = android.os.SystemClock.uptimeMillis()
                 if (now - lastNotificationErrorAt > 60_000) {
                     lastNotificationErrorAt = now
-                    Logs.e(this, "notification", "cannot post notification $id", error)
+                    Log.e("AriaService", "cannot post notification $id", error)
                 }
             }
     }
