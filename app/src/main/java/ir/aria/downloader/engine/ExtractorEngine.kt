@@ -115,6 +115,12 @@ class ExtractorEngine private constructor(
 
     data class SearchHit(val title: String, val url: String, val durationSec: Long?, val uploader: String)
 
+    /** Search failures must not be disguised as "song not found". */
+    data class SearchResponse(
+        val hits: List<SearchHit>,
+        val error: String? = null
+    )
+
     /** Progress event emitted by the python engine. */
     data class Progress(
         val downloaded: Long,
@@ -183,7 +189,7 @@ class ExtractorEngine private constructor(
     private fun optionsJson(): String {
         val obj = JSONObject()
         obj.put("cookies_path", cookiesFile().absolutePath.takeIf { cookiesFile().exists() } ?: "")
-        obj.put("user_agent", settings.userAgent)
+        obj.put("user_agent", settings.mediaUserAgentOverride)
         obj.put("fragment_concurrency", settings.fragmentConcurrency)
         obj.put("proxy", settings.proxyUrl.trim())
         return obj.toString()
@@ -200,12 +206,12 @@ class ExtractorEngine private constructor(
             val raw = module().callAttr("engine_info").toString()
             val json = JSONObject(raw)
             EngineInfo(
-                engine = json.optString("engine", "2.2.1"),
+                engine = json.optString("engine", "2.2.2"),
                 ytDlp = json.optString("yt_dlp", "?"),
                 python = json.optString("python", "?")
             )
         } catch (e: Throwable) {
-            EngineInfo("2.2.1", "unavailable", e.javaClass.simpleName)
+            EngineInfo("2.2.2", "unavailable", e.javaClass.simpleName)
         }
     }
 
@@ -331,11 +337,15 @@ class ExtractorEngine private constructor(
         }
     }
 
-    override suspend fun search(query: String, limit: Int): List<SearchHit> = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String, limit: Int): SearchResponse = withContext(Dispatchers.IO) {
         try {
             val raw = module().callAttr("search", query, limit, optionsJson()).toString()
             val json = JSONObject(raw)
-            if (!json.optBoolean("ok")) return@withContext emptyList()
+            if (!json.optBoolean("ok")) {
+                return@withContext SearchResponse(
+                    emptyList(), json.optString("error", "جست‌وجوی منبع صوتی ناموفق بود")
+                )
+            }
             val array: JSONArray = json.optJSONArray("entries") ?: JSONArray()
             val hits = ArrayList<SearchHit>()
             for (i in 0 until array.length()) {
@@ -351,9 +361,9 @@ class ExtractorEngine private constructor(
                     )
                 )
             }
-            hits
+            SearchResponse(hits)
         } catch (e: Throwable) {
-            emptyList()
+            SearchResponse(emptyList(), friendly(e))
         }
     }
 
@@ -377,7 +387,7 @@ class ExtractorEngine private constructor(
                 .put("format_id", formatId ?: "")
                 .put("preset", preset)
                 .put("cookies_path", cookiesFile().absolutePath.takeIf { cookiesFile().exists() } ?: "")
-                .put("user_agent", settings.userAgent)
+                .put("user_agent", settings.mediaUserAgentOverride)
                 .put("fragment_concurrency", settings.fragmentConcurrency)
                 .put("proxy", settings.proxyUrl.trim())
 

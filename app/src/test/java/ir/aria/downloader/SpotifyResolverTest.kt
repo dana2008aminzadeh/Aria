@@ -100,6 +100,44 @@ class SpotifyResolverTest {
     }
 
     @Test
+    fun findsTrackMetadataWhenEmbedWrapperChanges() {
+        val html = """
+            <script id="__NEXT_DATA__" type="application/json">{
+              "runtime": {"payload": {"entities": [{
+                "type": "track", "name": "A Song",
+                "artists": ["Artist A", {"name": "Artist B"}],
+                "durationMs": 200500
+              }]}}
+            }</script>
+        """.trimIndent()
+
+        val result = SpotifyResolver().parseEmbed(html)
+
+        assertTrue(result.ok)
+        assertEquals("A Song", result.tracks.single().title)
+        assertEquals("Artist A, Artist B", result.tracks.single().artists)
+        assertEquals(201L, result.tracks.single().durationSec)
+    }
+
+    @Test
+    fun singleTrackFallsBackToOEmbedWhenEmbedIsUnavailable() {
+        val requests = mutableListOf<String>()
+        val resolver = SpotifyResolver(fetcher = { url ->
+            requests += url
+            if (url.contains("/embed/")) throw IllegalStateException("embed unavailable")
+            """{"title":"Fallback Song","author_name":"Fallback Artist"}"""
+        })
+
+        val result = resolver.resolve("https://open.spotify.com/track/abc123")
+
+        assertTrue(result.ok)
+        assertEquals("Fallback Song", result.tracks.single().title)
+        assertEquals("Fallback Artist", result.tracks.single().artists)
+        assertEquals(2, requests.size)
+        assertTrue(requests.last().contains("/oembed?url="))
+    }
+
+    @Test
     fun rejectsUnsupportedSpotifyLinkTypesWithoutNetwork() {
         val resolver = SpotifyResolver(connectTimeoutMs = 1000, readTimeoutMs = 1000)
         val episode = resolver.resolve("https://open.spotify.com/episode/abc123")

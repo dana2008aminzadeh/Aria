@@ -8,6 +8,7 @@ object MediaUrlNormalizer {
 
     private val APARAT_ID = Regex("^[A-Za-z0-9]+$")
     private val PORNHUB_ID = Regex("^[A-Za-z0-9]+$")
+    private val INSTAGRAM_ID = Regex("^[A-Za-z0-9_-]{1,128}$")
     private val PORNHUB_HOSTS = listOf(
         "pornhub.com", "pornhub.net", "pornhub.org",
         "pornhubpremium.com", "pornhubpremium.net", "pornhubpremium.org"
@@ -23,9 +24,29 @@ object MediaUrlNormalizer {
         val host = uri.host?.lowercase()?.removePrefix("www.") ?: return original
         return when {
             host == "aparat.com" || host.endsWith(".aparat.com") -> normalizeAparat(uri, original)
+            host == "instagram.com" || host.endsWith(".instagram.com") || host == "instagr.am" ->
+                normalizeInstagram(uri, original)
             pornhubBase(host) != null -> normalizePornhub(uri, host, original)
             else -> original
         }
+    }
+
+    private fun normalizeInstagram(uri: URI, original: String): String {
+        val parts = uri.rawPath.orEmpty().split('/').filter { it.isNotBlank() }
+        if (parts.firstOrNull()?.equals("share", true) == true) {
+            // A /share/... token is not a shortcode; the extractor must follow its redirect.
+            return original
+        }
+        for (index in 0 until parts.lastIndex) {
+            val marker = parts[index].lowercase()
+            if (marker !in setOf("p", "reel", "reels", "tv")) continue
+            val id = parts[index + 1]
+            if (marker == "reels" && id.equals("audio", true)) return original
+            if (!INSTAGRAM_ID.matches(id)) return original
+            val kind = if (marker == "reels") "reel" else marker
+            return "https://www.instagram.com/$kind/$id/"
+        }
+        return original
     }
 
     private fun normalizeAparat(uri: URI, original: String): String {

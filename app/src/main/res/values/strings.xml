@@ -43,7 +43,7 @@
     <string name="notifications_system_disabled">دسترسی اعلان یا کانال «پایان دانلود» در تنظیمات سیستم خاموش است</string>
     <string name="notifications_open_settings">باز کردن تنظیمات اعلان سیستم</string>
     <string name="fragment_concurrency_value">اتصال موازی هر دانلود: %1$d</string>
-    <string name="fragment_concurrency">برای HLS/DASH و سایت‌هایی مثل آپارات؛ مقدار ۴ پیشنهاد می‌شود</string>
+    <string name="fragment_concurrency">برای HLS/DASH و سایت‌هایی مثل آپارات؛ مقدار پیش‌فرض ۶ است و اتصال بیشتر همیشه سریع‌تر نیست</string>
     <string name="auto_retry">تلاش خودکار مجدد</string>
     <string name="auto_retry_desc">در صورت قطع اتصال، دانلود دوباره ادامه پیدا می‌کند</string>
     <string name="save_folder">پوشه ذخیره</string>
@@ -105,7 +105,7 @@
     <string name="engine_missing">در دسترس نیست</string>
     <string name="open_source_licenses">مجوزهای متن‌باز و FFmpeg</string>
     <string name="cookies_title">کوکی (cookies.txt)</string>
-    <string name="cookies_desc">برای محتوای نیازمند ورود مانند اینستاگرام یا ویدیوهای محدود، فایل cookies.txt را که از مرورگر گرفته‌اید وارد کنید.</string>
+    <string name="cookies_desc">فقط برای محتوای خصوصی یا واقعاً نیازمند ورود. برای لینک‌های عمومی اینستاگرام ابتدا مسیر بدون کوکی و Embed عمومی استفاده می‌شود.</string>
     <string name="cookies_import">وارد کردن cookies.txt</string>
     <string name="cookies_delete">حذف کوکی‌ها</string>
     <string name="cookies_present">کوکی‌ها وارد شده‌اند</string>
