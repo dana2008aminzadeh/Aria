@@ -19,7 +19,7 @@ interface ExtractorApi {
         selection: ExtractorEngine.FormatSelection?
     ): ExtractorEngine.Plan = resolve(url, preset)
 
-    suspend fun search(query: String, limit: Int = 1): List<ExtractorEngine.SearchHit>
+    suspend fun search(query: String, limit: Int = 1): ExtractorEngine.SearchResponse
 
     suspend fun download(
         url: String,

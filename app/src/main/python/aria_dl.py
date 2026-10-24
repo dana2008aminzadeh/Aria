@@ -1,5 +1,5 @@
 """
-Aria Downloader 2.0 - extraction engine.
+Aria Downloader 2.2.2 - extraction engine.
 
 This file is shipped inside the APK and executed by Chaquopy (CPython 3.13 on Android).
 It is also run by the plain CPython interpreter in the test suite, so the code that is
@@ -16,10 +16,13 @@ Public API (everything is JSON so Kotlin can consume it directly):
     search(query, limit)              -> json   (used by the Spotify bridge)
 """
 
+import html as html_lib
+from html.parser import HTMLParser
 import json
 import os
 import re
 import sys
+import urllib.parse
 
 try:  # Android has no system CA bundle: yt-dlp/certifi provide one.
     import certifi
@@ -30,17 +33,49 @@ except Exception:  # pragma: no cover - optional
     pass
 
 import yt_dlp  # noqa: E402  (must come after the SSL env vars)
+from yt_dlp.networking import Request  # noqa: E402
+from yt_dlp.networking._urllib import UrllibRH  # noqa: E402
 
-ENGINE_VERSION = "2.2.1"
+ENGINE_VERSION = "2.2.2"
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular
-# HTTP media benefits from ranged chunks and a larger IO buffer.
-DEFAULT_FRAGMENT_CONCURRENCY = 4
+# HTTP media benefits from ranged chunks and a larger IO buffer. No rate limiter is set.
+DEFAULT_FRAGMENT_CONCURRENCY = 6
 MAX_FRAGMENT_CONCURRENCY = 8
-HTTP_CHUNK_SIZE = 8 * 1024 * 1024
-IO_BUFFER_SIZE = 256 * 1024
+HTTP_CHUNK_SIZE = 16 * 1024 * 1024
+IO_BUFFER_SIZE = 1024 * 1024
 MAX_PLAYLIST_ITEMS = 120
+
+
+class _AndroidUrllibRH(UrllibRH):
+    """Runs requests marked for browser impersonation on Android's available stack.
+
+    curl-cffi is preferred automatically when it is installed. Chaquopy does not provide
+    its native curl-impersonate library on every supported device, though, and yt-dlp's
+    Pornhub extractor otherwise rejects the request before any network I/O. Accepting the
+    extension here restores the ordinary HTTPS behaviour; it does not fake a TLS fingerprint
+    or bypass authentication, and Instagram can still tell that real impersonation is absent.
+    """
+
+    RH_KEY = "Urllib"
+    RH_NAME = "urllib-android-compat"
+
+    def _check_extensions(self, extensions):
+        extensions.pop("impersonate", None)
+        super()._check_extensions(extensions)
+
+
+class _AriaYoutubeDL(yt_dlp.YoutubeDL):
+    """Installs the Android compatibility handler without disabling real handlers."""
+
+    def build_request_director(self, handlers, preferences=None):
+        handlers = [
+            _AndroidUrllibRH if handler.RH_KEY == "Urllib" else handler
+            for handler in handlers
+        ]
+        return super().build_request_director(handlers, preferences)
+
 
 # --------------------------------------------------------------------------- helpers
 
@@ -60,7 +95,13 @@ def _human_error(exc):
     low = msg.lower()
     if "sign in to confirm" in low or "not a bot" in low:
         return "یوتیوب موقتاً این درخواست را مسدود کرده (بررسی ربات). چند دقیقه بعد یا با کوکی دوباره تلاش کنید."
-    if "empty media response" in low or "login_required" in low or "login required" in low:
+    if "rate-limit" in low or "rate limit" in low or "http error 429" in low:
+        return ("سایت دسترسی این IP را موقتاً محدود کرده است. کمی بعد دوباره تلاش کنید؛ "
+                "اگر ادامه داشت، شبکه یا پروکسی را تغییر دهید. این خطا به معنای نیاز قطعی به کوکی نیست.")
+    if "empty media response" in low:
+        return ("اینستاگرام پاسخ عمومی برای این لینک نداد. اگر پست در مرورگر بدون ورود باز می‌شود، "
+                "احتمالاً محدودیت موقت IP/شبکه است؛ بعداً یا با پروکسی تلاش کنید. محتوای خصوصی به ورود نیاز دارد.")
+    if "login_required" in low or "login required" in low:
         return "این محتوا نیاز به ورود دارد. فایل cookies.txt را از تنظیمات وارد کنید."
     if "unsupported url" in low:
         return "این لینک توسط موتور استخراج پشتیبانی نمی‌شود."
@@ -492,6 +533,215 @@ def _public_formats(rows):
 # --------------------------------------------------------------------------- extraction
 
 
+class _InstagramMetaParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.meta = {}
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "meta":
+            return
+        values = {str(key).lower(): value for key, value in attrs if key}
+        key = values.get("property") or values.get("name")
+        content = values.get("content")
+        if key and content and key.lower() not in self.meta:
+            self.meta[key.lower()] = content
+
+
+def _instagram_shortcode(url):
+    """Returns a real post shortcode; share tokens and audio pages are not posts."""
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        host = (parsed.hostname or "").lower().removeprefix("www.")
+        if host not in ("instagram.com", "instagr.am"):
+            return None
+        parts = [part for part in parsed.path.split("/") if part]
+        if not parts or parts[0].lower() == "share":
+            return None
+        for index, part in enumerate(parts[:-1]):
+            if part.lower() not in ("p", "reel", "reels", "tv"):
+                continue
+            shortcode = parts[index + 1]
+            if part.lower() == "reels" and shortcode.lower() == "audio":
+                return None
+            if re.fullmatch(r"[A-Za-z0-9_-]{1,128}", shortcode):
+                return shortcode
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def _clean_instagram_media_url(value):
+    if not isinstance(value, str):
+        return None
+    value = html_lib.unescape(value).strip()
+    try:
+        parsed = urllib.parse.urlsplit(value)
+    except ValueError:
+        return None
+    if parsed.scheme.lower() != "https" or not parsed.hostname:
+        return None
+    return value
+
+
+def _instagram_text_variants(page):
+    """Embedded data appears both as JSON and as HTML/JSON escaped strings."""
+    decoded = html_lib.unescape(page)
+    variants = [decoded]
+    if '\\"' in decoded:
+        variants.append(decoded.replace('\\"', '"'))
+    return variants
+
+
+def _instagram_json_strings(text, key):
+    pattern = re.compile(r'"' + re.escape(key) + r'"\s*:\s*("(?:\\.|[^"\\])*")')
+    for match in pattern.finditer(text):
+        try:
+            value = json.loads(match.group(1))
+        except (TypeError, ValueError):
+            continue
+        if isinstance(value, str):
+            yield value
+
+
+def _instagram_video_versions(text):
+    marker = re.compile(r'"video_versions"\s*:\s*')
+    for match in marker.finditer(text):
+        try:
+            value, _ = json.JSONDecoder().raw_decode(text, match.end())
+        except (TypeError, ValueError):
+            continue
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def _instagram_format(format_id, url, width=0, height=0, item=None):
+    item = item or {}
+    path = urllib.parse.urlsplit(url).path.lower()
+    ext = path.rsplit(".", 1)[-1] if "." in path.rsplit("/", 1)[-1] else "mp4"
+    if ext not in ("mp4", "m4v", "mov", "webm"):
+        ext = "mp4"
+    safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(format_id or "ig-public"))
+    return {
+        "format_id": safe_id,
+        "url": url,
+        "ext": ext,
+        "width": _int_value(item.get("width")) or _int_value(width) or 0,
+        "height": _int_value(item.get("height")) or _int_value(height) or 0,
+        "vcodec": item.get("video_codec"),
+        "acodec": "none" if item.get("has_audio") is False else None,
+    }
+
+
+def _parse_instagram_public_embed(page, shortcode, webpage_url):
+    """Builds a normal yt-dlp info dict from a public embed, with stable format IDs."""
+    parser = _InstagramMetaParser()
+    try:
+        parser.feed(page)
+    except Exception:
+        # HTMLParser is forgiving, but a malformed document must not crash the fallback.
+        pass
+    meta = parser.meta
+    formats = []
+    seen = set()
+
+    def add(format_id, url, width=0, height=0, item=None):
+        url = _clean_instagram_media_url(url)
+        if not url or url in seen:
+            return
+        seen.add(url)
+        formats.append(_instagram_format(format_id, url, width, height, item))
+
+    for text in _instagram_text_variants(page):
+        for index, item in enumerate(_instagram_video_versions(text)):
+            height = _int_value(item.get("height")) or 0
+            # InstagramIE also uses id/type directly; retaining it keeps an earlier exact
+            # quality selection valid if the normal path fails only at download time.
+            identity = item.get("id") or item.get("type") or "ig-%d-%s" % (index, height)
+            add(identity, item.get("url"), item=item)
+        for key in ("video_url", "videoUrl"):
+            for url in _instagram_json_strings(text, key):
+                add("ig-public", url, meta.get("og:video:width", 0),
+                    meta.get("og:video:height", 0))
+        if formats:
+            break
+
+    if not formats:
+        for key in ("og:video:secure_url", "og:video", "twitter:player:stream"):
+            add("ig-public", meta.get(key), meta.get("og:video:width", 0),
+                meta.get("og:video:height", 0))
+
+    if not formats:
+        # Some documents expose only contentUrl. Accept it only when it is visibly media,
+        # not an image or a link to another HTML page.
+        for text in _instagram_text_variants(page):
+            for url in _instagram_json_strings(text, "contentUrl"):
+                path = urllib.parse.urlsplit(html_lib.unescape(url)).path.lower()
+                if path.endswith((".mp4", ".m4v", ".mov", ".webm")):
+                    add("ig-public", url)
+            if formats:
+                break
+
+    if not formats:
+        return None
+    formats.sort(key=lambda row: (row["height"], row["width"]), reverse=True)
+    duration = meta.get("og:video:duration") or meta.get("video:duration")
+    try:
+        duration = float(duration) if duration else None
+    except (TypeError, ValueError):
+        duration = None
+    return {
+        "id": shortcode,
+        "title": _sanitize(meta.get("og:title") or "Instagram " + shortcode),
+        "webpage_url": webpage_url,
+        "original_url": webpage_url,
+        "extractor": "InstagramPublicEmbed",
+        "extractor_key": "InstagramPublicEmbed",
+        "duration": duration,
+        "formats": formats,
+        "http_headers": {"Referer": "https://www.instagram.com/"},
+    }
+
+
+def _instagram_public_embed(ydl, url):
+    shortcode = _instagram_shortcode(url)
+    if not shortcode:
+        return None
+    embed_url = "https://www.instagram.com/p/%s/embed/captioned/" % shortcode
+    request = Request(embed_url, headers={
+        "Referer": "https://www.instagram.com/p/%s/" % shortcode,
+        "Accept": "text/html,application/xhtml+xml",
+    })
+    response = ydl.urlopen(request)
+    try:
+        final_path = urllib.parse.urlsplit(response.url).path
+        if final_path.startswith("/accounts/login"):
+            return None
+        page = response.read().decode("utf-8", "replace")
+    finally:
+        response.close()
+    return _parse_instagram_public_embed(page, shortcode, url)
+
+
+def _extract_info(ydl, url, download=False):
+    """Uses yt-dlp first, then Instagram's public embed only as a no-login fallback."""
+    try:
+        return ydl.extract_info(url, download=download)
+    except Exception as exc:
+        if exc.__class__.__name__ in ("_Cancelled", "DownloadCancelled"):
+            raise
+        if not _instagram_shortcode(url):
+            raise
+        try:
+            fallback = _instagram_public_embed(ydl, url)
+        except Exception:
+            fallback = None
+        if fallback is None:
+            raise
+        return ydl.process_ie_result(fallback, download=download)
+
+
 def _extract(url, options, download=False, flat_playlist=False):
     opts = _base_opts(options)
     probe_only = not download
@@ -507,8 +757,8 @@ def _extract(url, options, download=False, flat_playlist=False):
             "lazy_playlist": True,
             "playlistend": MAX_PLAYLIST_ITEMS,
         })
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    with _AriaYoutubeDL(opts) as ydl:
+        info = _extract_info(ydl, url, download=False)
         if info is None:
             raise RuntimeError("محتوایی پیدا نشد")
         return ydl.sanitize_info(info)
@@ -701,8 +951,8 @@ def download(request_json, callback=None):
 
         opts["progress_hooks"] = [hook]
 
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+        with _AriaYoutubeDL(opts) as ydl:
+            info = _extract_info(ydl, url, download=True)
             if info is None:
                 raise RuntimeError("دانلود ناموفق بود")
             info = _first_entry(ydl.sanitize_info(info))
@@ -756,7 +1006,7 @@ def search(query, limit=1, options_json="{}"):
         options["noplaylist"] = True
         opts = _base_opts(options)
         opts.update({"skip_download": True, "extract_flat": True})
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        with _AriaYoutubeDL(opts) as ydl:
             info = ydl.extract_info("ytsearch%d:%s" % (max(1, int(limit)), query), download=False)
             info = ydl.sanitize_info(info)
         entries = []

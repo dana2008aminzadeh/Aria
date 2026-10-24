@@ -36,6 +36,8 @@ class SettingsTest {
         assertTrue(settings.autoRetry)
         assertEquals("best", settings.defaultPreset)
         assertEquals(HttpDownloader.DEFAULT_USER_AGENT, settings.userAgent)
+        assertEquals("yt-dlp must keep its current browser headers", "", settings.mediaUserAgentOverride)
+        assertEquals(6, Settings.DEFAULT_FRAGMENT_CONCURRENCY)
         assertEquals("", settings.proxyUrl)
     }
 
@@ -58,6 +60,7 @@ class SettingsTest {
         assertFalse(reopened.autoRetry)
         assertEquals("1080", reopened.defaultPreset)
         assertEquals("CustomAgent/2.0", reopened.userAgent)
+        assertEquals("CustomAgent/2.0", reopened.mediaUserAgentOverride)
     }
 
     @Test

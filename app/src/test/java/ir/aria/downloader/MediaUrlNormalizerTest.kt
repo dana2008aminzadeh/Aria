@@ -69,6 +69,22 @@ class MediaUrlNormalizerTest {
     }
 
     @Test
+    fun instagramPostAndReelLinksKeepTheirIdAndDropTracking() {
+        assertEquals(
+            "https://www.instagram.com/reel/CqLM8bIrGRK/",
+            MediaUrlNormalizer.normalize("https://instagr.am/reels/CqLM8bIrGRK/?igsh=share")
+        )
+        assertEquals(
+            "https://www.instagram.com/p/aye83DjauH/",
+            MediaUrlNormalizer.normalize("https://www.instagram.com/p/aye83DjauH/?foo=bar")
+        )
+        val shareToken = "https://www.instagram.com/share/reel/ABC123"
+        assertEquals(shareToken, MediaUrlNormalizer.normalize(shareToken))
+        val audio = "https://www.instagram.com/reels/audio/12345"
+        assertEquals(audio, MediaUrlNormalizer.normalize(audio))
+    }
+
+    @Test
     fun unrelatedLinksAreNotModified() {
         val url = "https://www.youtube.com/watch?v=aqz-KE-bpKQ&t=10"
         assertEquals(url, MediaUrlNormalizer.normalize(url))

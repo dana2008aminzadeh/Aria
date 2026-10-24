@@ -80,19 +80,28 @@ class LinkIngestor(
                         for (track in collection.tracks) {
                             if (requests.size >= MAX_ITEMS) break
                             onStatus("اسپاتیفای: جست‌وجوی ${track.title}")
-                            var candidates = engine.search(track.query, 8)
+                            val primarySearch = engine.search(track.query, 8)
+                            var candidates = primarySearch.hits
+                            var searchError = primarySearch.error
                             var match = SpotifyMatcher.bestMatch(track, candidates)
                             if (match == null) {
                                 val preciseQuery = SpotifyResolver.preciseQuery(track.title, track.artists)
                                 if (preciseQuery != track.query) {
                                     onStatus("تطبیق دقیق‌تر: ${track.title}")
-                                    candidates = candidates + engine.search(preciseQuery, 5)
+                                    val preciseSearch = engine.search(preciseQuery, 5)
+                                    candidates = candidates + preciseSearch.hits
+                                    searchError = preciseSearch.error
                                     match = SpotifyMatcher.bestMatch(track, candidates)
                                 }
                             }
                             val matched = match
                             if (matched == null) {
-                                warnings.add("نتیجهٔ مطمئن برای آهنگ «${track.title}» پیدا نشد؛ نتیجهٔ مشابه/اشتباه دانلود نمی‌شود.")
+                                val detail = searchError?.takeIf { it.isNotBlank() }
+                                    ?.let { "\nخطای جست‌وجوی منبع: $it" }.orEmpty()
+                                warnings.add(
+                                    "نتیجهٔ مطمئن برای آهنگ «${track.title}» پیدا نشد؛ " +
+                                        "نتیجهٔ مشابه/اشتباه دانلود نمی‌شود.$detail"
+                                )
                                 continue
                             }
                             val hit = matched.hit
