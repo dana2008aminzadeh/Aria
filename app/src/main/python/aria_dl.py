@@ -1,5 +1,5 @@
 """
-Aria Downloader 2.2.2 - extraction engine.
+Aria Downloader 2.2.3 - extraction engine.
 
 This file is shipped inside the APK and executed by Chaquopy (CPython 3.13 on Android).
 It is also run by the plain CPython interpreter in the test suite, so the code that is
@@ -36,7 +36,7 @@ import yt_dlp  # noqa: E402  (must come after the SSL env vars)
 from yt_dlp.networking import Request  # noqa: E402
 from yt_dlp.networking._urllib import UrllibRH  # noqa: E402
 
-ENGINE_VERSION = "2.2.2"
+ENGINE_VERSION = "2.2.3"
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular

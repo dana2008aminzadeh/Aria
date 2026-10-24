@@ -86,6 +86,50 @@ class SpotifyMatcherTest {
     }
 
     @Test
+    fun remixInArtistNameDoesNotRejectClandestinaCover() {
+        val target = track(
+            title = "Clandestina (Cover)",
+            artists = "Emma Peters, Edmofo Remix",
+            duration = 213
+        )
+        val official = hit(
+            title = "Clandestina (Cover)",
+            artist = "Emma Péters & Edmofo Remix - Topic",
+            duration = 214,
+            id = "UTgnOwpafpw"
+        )
+
+        val match = SpotifyMatcher.bestMatch(target, listOf(official))
+
+        assertEquals("UTgnOwpafpw", match?.hit?.url?.substringAfterLast('/'))
+        assertTrue((match?.score ?: 0) >= SpotifyMatcher.MIN_CONFIDENCE)
+    }
+
+    @Test
+    fun actualRemixTitleIsStillRejectedWhenArtistNameAlsoContainsRemix() {
+        val target = track(
+            title = "Clandestina (Cover)",
+            artists = "Emma Peters, Edmofo Remix",
+            duration = 213
+        )
+        val actualRemix = hit(
+            title = "Clandestina (Cover) (Edmofo Remix)",
+            artist = "Emma Péters & Edmofo Remix - Topic",
+            duration = 213
+        )
+
+        assertNull(SpotifyMatcher.bestMatch(target, listOf(actualRemix)))
+    }
+
+    @Test
+    fun genericCoverChannelIsStillRejectedWhenRequestedArtistIsMissing() {
+        val target = track(title = "Song", artists = "Real Artist", duration = 213)
+        val cover = hit("Song", artist = "Best Covers", duration = 213)
+
+        assertNull(SpotifyMatcher.bestMatch(target, listOf(cover)))
+    }
+
+    @Test
     fun emptyAndBlankCandidatesAreIgnored() {
         assertNull(SpotifyMatcher.bestMatch(track(), emptyList()))
         assertNull(SpotifyMatcher.bestMatch(track(), listOf(hit("Song").copy(url = ""))))

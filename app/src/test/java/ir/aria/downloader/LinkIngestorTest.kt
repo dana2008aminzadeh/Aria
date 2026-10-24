@@ -174,6 +174,32 @@ class LinkIngestorTest {
     }
 
     @Test
+    fun reportedClandestinaCoverIsAcceptedWithRemixArtistName() = runBlocking {
+        val albumUrl = "https://open.spotify.com/album/4MXxuWsvppJvR2K4sgx8bz?si=share"
+        val track = SpotifyResolver.Track(
+            title = "Clandestina (Cover)",
+            artists = "Emma Peters, Edmofo Remix",
+            query = "Emma Peters Clandestina (Cover) audio",
+            durationSec = 213
+        )
+        val engine = FakeEngine(searchResults = mapOf(track.query to listOf(
+            ExtractorEngine.SearchHit(
+                "Clandestina (Cover)", "https://youtu.be/UTgnOwpafpw",
+                214, "Emma Péters & Edmofo Remix - Topic"
+            )
+        )))
+        val collection = SpotifyResolver.Collection(true, "Clandestina (Cover)", listOf(track))
+
+        val report = LinkIngestor(engine, spotifyLookup = { collection })
+            .ingest(listOf(albumUrl), preset = "audio")
+
+        assertEquals(1, report.requests.size)
+        assertEquals("https://youtu.be/UTgnOwpafpw", report.requests.single().url)
+        assertEquals(1, engine.searchCalls)
+        assertTrue(report.warnings.none { it.contains("مطمئن") })
+    }
+
+    @Test
     fun brokenSpotifyLinkProducesOnlyAWarning() = runBlocking {
         val report = LinkIngestor(
             FakeEngine(),

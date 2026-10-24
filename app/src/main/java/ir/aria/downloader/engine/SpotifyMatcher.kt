@@ -22,11 +22,19 @@ object SpotifyMatcher {
     fun score(track: SpotifyResolver.Track, hit: ExtractorEngine.SearchHit): Int {
         val cleanTarget = SpotifyResolver.cleanTitle(track.title)
         var result = titleScore(cleanTarget, hit.title)
-        result += artistScore(track.artists, hit.title + " " + hit.uploader)
+        val artistCompatibility = artistScore(track.artists, hit.title + " " + hit.uploader)
+        result += artistCompatibility
         result += durationScore(track.durationSec, hit.durationSec)
 
         val targetFlags = versionFlags(track.title)
-        val candidateFlags = versionFlags(hit.title + " " + hit.uploader)
+        // Version words belong to the recording title, not automatically to the artist/channel.
+        // "Edmofo Remix" is an artist name and must not turn every upload into a remix.
+        val candidateFlags = versionFlags(hit.title).toMutableSet()
+        if (artistCompatibility == 0 && track.artists.isNotBlank()) {
+            // Still reject a generic cover/karaoke channel when none of the requested
+            // artists appears anywhere in the candidate metadata.
+            candidateFlags += versionFlags(hit.uploader).intersect(CHANNEL_ONLY_VARIANTS)
+        }
         for (flag in HARD_VARIANTS) {
             val wanted = flag in targetFlags
             val offered = flag in candidateFlags
@@ -117,6 +125,7 @@ object SpotifyMatcher {
     )
 
     private val HARD_VARIANTS = VARIANT_PATTERNS.keys - "remaster"
+    private val CHANNEL_ONLY_VARIANTS = setOf("cover", "karaoke")
 
     private fun versionFlags(text: String): Set<String> {
         val normalized = normalize(text)

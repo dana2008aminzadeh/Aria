@@ -100,6 +100,34 @@ class SpotifyResolverTest {
     }
 
     @Test
+    fun parsesReportedClandestinaSingleAlbum() {
+        val html = """
+            <script id="__NEXT_DATA__" type="application/json">{
+              "props": {"pageProps": {"state": {"data": {"entity": {
+                "type": "album", "title": "Clandestina (Cover)",
+                "trackList": [{
+                  "title": "Clandestina (Cover)",
+                  "subtitle": "Emma Peters, Edmofo Remix",
+                  "duration": 213000
+                }]
+              }}}}}
+            }</script>
+        """.trimIndent()
+
+        val result = SpotifyResolver().parseEmbed(html)
+
+        assertTrue(result.ok)
+        assertEquals(1, result.tracks.size)
+        assertEquals("Clandestina (Cover)", result.tracks.single().title)
+        assertEquals("Emma Peters, Edmofo Remix", result.tracks.single().artists)
+        assertEquals(213L, result.tracks.single().durationSec)
+        assertEquals(
+            "Emma Peters Clandestina (Cover) audio",
+            result.tracks.single().query
+        )
+    }
+
+    @Test
     fun findsTrackMetadataWhenEmbedWrapperChanges() {
         val html = """
             <script id="__NEXT_DATA__" type="application/json">{
