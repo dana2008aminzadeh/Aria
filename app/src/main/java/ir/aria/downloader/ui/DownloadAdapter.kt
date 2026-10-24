@@ -56,7 +56,10 @@ class DownloadAdapter(
             bindAction(item)
 
             binding.typeIcon.text = iconFor(item)
-            binding.engineBadge.visibility = if (item.isMedia) View.VISIBLE else View.GONE
+            val badge = PlatformBadge.of(item.url)
+            binding.platformBadge.text = badge.symbol
+            binding.platformBadge.setBackgroundResource(badge.background)
+            binding.platformBadge.setTextColor(ContextCompat.getColor(context, badge.textColor))
             binding.checkBox.visibility = if (selectionMode()) View.VISIBLE else View.GONE
             binding.checkBox.isChecked = isSelected(item.id)
             binding.root.setCardBackgroundColor(
@@ -86,8 +89,11 @@ class DownloadAdapter(
                         Formats.bytes(item.totalBytes)
                 DownloadStatus.RUNNING -> {
                     val base = if (item.totalBytes > 0) {
-                        item.progressPercent.toString() + "% • " +
-                            Formats.bytes(item.downloadedBytes) + " / " + Formats.bytes(item.totalBytes)
+                        context.getString(
+                            R.string.queue_info,
+                            Formats.bytes(item.downloadedBytes),
+                            Formats.bytes(item.totalBytes)
+                        )
                     } else {
                         context.getString(R.string.connecting) + " • " + Formats.bytes(item.downloadedBytes)
                     }
@@ -98,7 +104,11 @@ class DownloadAdapter(
                     context.getString(R.string.paused)
                 } else {
                     context.getString(R.string.waiting_wifi)
-                }) + " • " + Formats.bytes(item.downloadedBytes) + " / " + Formats.bytes(item.totalBytes)
+                }) + " • " + context.getString(
+                    R.string.queue_info,
+                    Formats.bytes(item.downloadedBytes),
+                    Formats.bytes(item.totalBytes)
+                )
                 DownloadStatus.FAILED -> context.getString(R.string.failed) + " • " +
                     (item.errorMessage ?: "")
                 DownloadStatus.COMPLETED -> {

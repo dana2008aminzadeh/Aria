@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero illustration: orange download cloud with floating platform icons,
+     matching the Aria 3.0 mockup. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="220dp"
+    android:height="170dp"
+    android:viewportWidth="220"
+    android:viewportHeight="170">
+
+    <!-- confetti -->
+    <path android:fillColor="#FFD9A8" android:pathData="M17,62a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z" />
+    <path android:fillColor="#FFE3C2" android:pathData="M198,104a5,5 0 1,0 10,0a5,5 0 1,0 -10,0z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.55" android:pathData="M188,16a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.4" android:pathData="M24,120a3,3 0 1,0 6,0a3,3 0 1,0 -6,0z" />
+    <path android:fillColor="#E85D00" android:fillAlpha="0.5" android:pathData="M10,96a3.4,3.4 0 1,0 6.8,0a3.4,3.4 0 1,0 -6.8,0z" />
+
+    <!-- cloud shadow -->
+    <path android:fillColor="#C94F00" android:fillAlpha="0.25" android:pathData="M52,152a58,8 0 1,0 116,0a58,8 0 1,0 -116,0z" />
+
+    <!-- cloud body -->
+    <path android:fillColor="#F07E00" android:pathData="M32,118a30,30 0 1,0 60,0a30,30 0 1,0 -60,0z" />
+    <path android:fillColor="#F07E00" android:pathData="M130,120a28,28 0 1,0 56,0a28,28 0 1,0 -56,0z" />
+    <path android:fillColor="#FB8A1E" android:pathData="M70,92a40,40 0 1,0 80,0a40,40 0 1,0 -80,0z" />
+    <path android:fillColor="#F07E00" android:pathData="M59,112h102a19,19 0 0 1 19,19a19,19 0 0 1 -19,19H59a19,19 0 0 1 -19,-19a19,19 0 0 1 19,-19z" />
+    <!-- highlight -->
+    <path android:fillColor="#FFA94D" android:pathData="M74,84a26,26 0 1,0 52,0a26,26 0 1,0 -52,0z" />
+
+    <!-- white arrow panel -->
+    <path android:fillColor="#FFFFFF" android:pathData="M102,96h16a14,14 0 0 1 14,14v16a14,14 0 0 1 -14,14h-16a14,14 0 0 1 -14,-14v-16a14,14 0 0 1 14,-14z" />
+    <path android:fillColor="#F07E00" android:pathData="M106,105h8v13h7l-11,12l-11,-12h7z" />
+
+    <!-- YouTube chip -->
+    <path android:fillColor="#FF0000" android:pathData="M91,8h18a7,7 0 0 1 7,7v10a7,7 0 0 1 -7,7H91a7,7 0 0 1 -7,-7V15a7,7 0 0 1 7,-7z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M96,14l11,6l-11,6z" />
+
+    <!-- Instagram chip -->
+    <path android:fillColor="#D6319A" android:pathData="M42,26h12a8,8 0 0 1 8,8v12a8,8 0 0 1 -8,8H42a8,8 0 0 1 -8,-8V34a8,8 0 0 1 8,-8z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="2.6"
+        android:pathData="M41.5,40a6.5,6.5 0 1,0 13,0a6.5,6.5 0 1,0 -13,0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M54.4,30.6a1.9,1.9 0 1,0 3.8,0a1.9,1.9 0 1,0 -3.8,0z" />
+
+    <!-- Spotify chip -->
+    <path android:fillColor="#191414" android:pathData="M138,22a14,14 0 1,0 28,0a14,14 0 1,0 -28,0z" />
+    <path android:fillColor="#00000000" android:strokeColor="#1DB954" android:strokeWidth="2.6" android:strokeLineCap="round"
+        android:pathData="M144,17.5c5,-1.8 11,-1.4 15.5,1" />
+    <path android:fillColor="#00000000" android:strokeColor="#1DB954" android:strokeWidth="2.3" android:strokeLineCap="round"
+        android:pathData="M145,22.5c4.2,-1.4 9.2,-1 13,0.9" />
+    <path android:fillColor="#00000000" android:strokeColor="#1DB954" android:strokeWidth="2" android:strokeLineCap="round"
+        android:pathData="M146.2,27.2c3.4,-1 7.2,-0.8 10.4,0.7" />
+
+    <!-- PH chip -->
+    <path android:fillColor="#1B1B1B" android:pathData="M182,50h20a6,6 0 0 1 6,6v13a6,6 0 0 1 -6,6h-20a6,6 0 0 1 -6,-6V56a6,6 0 0 1 6,-6z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M181.5,58h2.2v9h-2.2z M183.7,58h2.8a2.4,2.4 0 0 1 0,4.8h-2.8z" />
+    <path android:fillColor="#FF9000" android:pathData="M192,56h8.5a3.5,3.5 0 0 1 3.5,3.5v6a3.5,3.5 0 0 1 -3.5,3.5H192a3.5,3.5 0 0 1 -3.5,-3.5v-6a3.5,3.5 0 0 1 3.5,-3.5z" />
+    <path android:fillColor="#1B1B1B" android:pathData="M192.5,58.5h2v3h2.5v-3h2v8h-2v-3h-2.5v3h-2z" />
+</vector>

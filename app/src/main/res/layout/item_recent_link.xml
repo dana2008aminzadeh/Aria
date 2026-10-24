@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/recentCard"
+    android:layout_width="190dp"
+    android:layout_height="wrap_content"
+    android:layout_marginEnd="8dp"
+    android:layoutDirection="rtl"
+    app:cardBackgroundColor="@color/aria_surface"
+    app:cardCornerRadius="18dp"
+    app:cardElevation="0dp"
+    app:strokeColor="#FFE9D2"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="10dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingEnd="8dp">
+
+            <TextView
+                android:id="@+id/recentTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/aria_text"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="عکس‌های سفر استانبول" />
+
+            <TextView
+                android:id="@+id/recentDomain"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/aria_text_dim"
+                android:textDirection="ltr"
+                android:textSize="9sp"
+                tools:text="instagram.com" />
+
+            <TextView
+                android:id="@+id/recentSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="9sp"
+                tools:text="2.4 MB" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="52dp"
+            android:layout_height="52dp">
+
+            <TextView
+                android:id="@+id/recentIcon"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_icon"
+                android:gravity="center"
+                android:text="📄"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/recentBadge"
+                android:layout_width="17dp"
+                android:layout_height="17dp"
+                android:layout_gravity="bottom|end"
+                android:background="@drawable/bg_badge_circle"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="🔗"
+                android:textSize="7sp"
+                tools:text="📷" />
+        </FrameLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

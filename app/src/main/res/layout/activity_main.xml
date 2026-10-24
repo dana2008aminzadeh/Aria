@@ -5,572 +5,649 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/aria_bg"
+    android:clipChildren="false"
     android:layoutDirection="rtl"
     android:orientation="vertical"
     tools:context=".ui.MainActivity">
 
-    <!-- Hero -->
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/homeScroll"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_hero"
-        android:orientation="vertical"
-        android:paddingStart="16dp"
-        android:paddingTop="14dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="18dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipChildren="false"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/headerPremium"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@drawable/bg_card"
-                android:gravity="center"
-                android:text="👑"
-                android:textSize="18sp" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <ImageButton
-                android:id="@+id/headerMenu"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@drawable/bg_card"
-                android:contentDescription="@string/settings"
-                android:src="@drawable/ic_menu" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/hero_greeting"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/hero_title"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/hero_subtitle"
-            android:textColor="#FFE9D2"
-            android:textSize="12sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:background="@drawable/bg_card"
+            android:clipChildren="false"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:paddingBottom="10dp">
+
+            <!-- Hero -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_hero"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="18dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageButton
+                        android:id="@+id/headerMenu"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_hero_chip"
+                        android:contentDescription="@string/settings"
+                        android:src="@drawable/ic_menu" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/headerPremium"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_hero_chip"
+                        android:gravity="center"
+                        android:text="👑"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/hero_greeting"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/hero_title"
+                            android:textColor="#FFFFFF"
+                            android:textSize="24sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/hero_subtitle"
+                            android:textColor="#FFE9D2"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="156dp"
+                        android:layout_height="122dp"
+                        android:layout_marginStart="4dp"
+                        android:contentDescription="@string/hero_art_desc"
+                        android:src="@drawable/img_hero_cloud" />
+                </LinearLayout>
+
+                <!-- Direct download card -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_card"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:background="@drawable/bg_circle_orange"
+                            android:gravity="center"
+                            android:text="🔗"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/direct_download"
+                            android:textColor="@color/aria_text"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/quickUrlInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_input"
+                        android:drawableStart="@drawable/ic_paste"
+                        android:drawablePadding="8dp"
+                        android:hint="@string/quick_url_hint"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri|textMultiLine"
+                        android:maxLines="3"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:textColor="@color/aria_text"
+                        android:textColorHint="@color/aria_text_dim"
+                        android:textDirection="ltr"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/quickDownloadButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_orange_button"
+                        android:text="@string/download_cta"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        app:backgroundTint="@null"
+                        app:icon="@drawable/ic_download"
+                        app:iconGravity="textEnd"
+                        app:iconTint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Shortcuts -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginEnd="16dp"
+                android:text="@string/shortcuts"
+                android:textColor="@color/aria_text"
+                android:textSize="15sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="12dp"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:background="@drawable/bg_circle_orange"
-                    android:gravity="center"
-                    android:text="🔗"
-                    android:textSize="14sp" />
-
-                <TextView
+                <LinearLayout
+                    android:id="@+id/shortcutDirect"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:text="@string/direct_download"
-                    android:textColor="@color/aria_text"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:background="@drawable/bg_shortcut"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingStart="4dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_circle_link"
+                        android:gravity="center"
+                        android:text="🔗"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/shortcut_direct"
+                        android:textColor="@color/aria_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="مستقیم"
+                        android:textColor="@color/aria_text_dim"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/shortcutInstagram"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_shortcut"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingStart="4dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_circle_instagram"
+                        android:gravity="center"
+                        android:text="📷"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Instagram"
+                        android:textColor="@color/aria_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="اینستاگرام"
+                        android:textColor="@color/aria_text_dim"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/shortcutYoutube"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_shortcut"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingStart="4dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_circle_youtube"
+                        android:gravity="center"
+                        android:text="▶"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="YouTube"
+                        android:textColor="@color/aria_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="یوتیوب"
+                        android:textColor="@color/aria_text_dim"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/shortcutSpotify"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_shortcut"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingStart="4dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_circle_spotify"
+                        android:gravity="center"
+                        android:text="🎵"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Spotify"
+                        android:textColor="@color/aria_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="اسپاتیفای"
+                        android:textColor="@color/aria_text_dim"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/shortcutPornhub"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_shortcut"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingStart="4dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_circle_pornhub"
+                        android:gravity="center"
+                        android:text="PH"
+                        android:textColor="#FF9000"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Pornhub"
+                        android:textColor="@color/aria_text"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="پورن‌هاب"
+                        android:textColor="@color/aria_text_dim"
+                        android:textSize="9sp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <EditText
-                android:id="@+id/quickUrlInput"
+            <!-- Group download -->
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_input"
-                android:hint="@string/quick_url_hint"
-                android:importantForAutofill="no"
-                android:inputType="textUri|textMultiLine"
-                android:maxLines="3"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:textColor="@color/aria_text"
-                android:textColorHint="@color/aria_text_dim"
-                android:textDirection="ltr"
-                android:textSize="13sp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/quickDownloadButton"
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_orange_button"
-                android:text="@string/download_cta"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                app:backgroundTint="@null"
-                app:icon="@drawable/ic_download" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Shortcuts -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="14dp"
-        android:layout_marginEnd="16dp"
-        android:text="@string/shortcuts"
-        android:textColor="@color/aria_text"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="12dp"
-        android:orientation="horizontal">
-
-        <LinearLayout
-            android:id="@+id/shortcutDirect"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_shortcut"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
-
-            <TextView
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_circle_link"
-                android:gravity="center"
-                android:text="🔗"
-                android:textSize="15sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/shortcut_direct"
-                android:textColor="@color/aria_text"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="مستقیم"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/shortcutInstagram"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_shortcut"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
-
-            <TextView
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_circle_instagram"
-                android:gravity="center"
-                android:text="📷"
-                android:textSize="15sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Instagram"
-                android:textColor="@color/aria_text"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="اینستاگرام"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/shortcutYoutube"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_shortcut"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
-
-            <TextView
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_circle_youtube"
-                android:gravity="center"
-                android:text="▶"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="YouTube"
-                android:textColor="@color/aria_text"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="یوتیوب"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/shortcutSpotify"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_shortcut"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
-
-            <TextView
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_circle_spotify"
-                android:gravity="center"
-                android:text="🎵"
-                android:textSize="15sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Spotify"
-                android:textColor="@color/aria_text"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="اسپاتیفای"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/shortcutPornhub"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@drawable/bg_shortcut"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
-
-            <TextView
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_circle_pornhub"
-                android:gravity="center"
-                android:text="PH"
-                android:textColor="#FF9000"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Pornhub"
-                android:textColor="@color/aria_text"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="پورن‌هاب"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Group download -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="12dp"
-        android:background="@drawable/bg_card"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="12dp">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/group_download"
-                android:textColor="@color/aria_text"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/group_download_desc"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="10sp" />
-        </LinearLayout>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/groupAddButton"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/group_add" />
-    </LinearLayout>
-
-    <!-- Aggregate -->
-    <LinearLayout
-        android:id="@+id/aggregateCard"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="12dp"
-        android:background="@drawable/bg_card"
-        android:orientation="vertical"
-        android:padding="12dp"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/aggregateTitle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="@color/aria_text"
-                android:textSize="13sp"
-                tools:text="۳ دانلود در حال انجام" />
-
-            <TextView
-                android:id="@+id/aggregateSpeed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/aria_primary"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                tools:text="4.2 MB/s" />
-        </LinearLayout>
-
-        <ProgressBar
-            android:id="@+id/aggregateProgress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="8dp"
-            android:max="100"
-            android:progressBackgroundTint="@color/aria_surface2"
-            android:progressTint="@color/aria_primary" />
-    </LinearLayout>
-
-    <EditText
-        android:id="@+id/searchInput"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="12dp"
-        android:background="@drawable/bg_input"
-        android:hint="@string/search_hint"
-        android:importantForAutofill="no"
-        android:inputType="text"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:singleLine="true"
-        android:textColor="@color/aria_text"
-        android:textColorHint="@color/aria_text_dim"
-        android:textSize="14sp" />
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingStart="12dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:scrollbars="none">
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/filterChips"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:singleLine="true"
-            app:chipSpacingHorizontal="6dp">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipAll"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/all" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipActive"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/active" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipCompleted"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/completed" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipPaused"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/paused" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipFailed"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/failed" />
-        </com.google.android.material.chip.ChipGroup>
-    </HorizontalScrollView>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="6dp"
-        android:layout_marginEnd="16dp"
-        android:text="@string/queue_title"
-        android:textColor="@color/aria_text"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingStart="10dp"
-            android:paddingTop="8dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="12dp" />
-
-        <LinearLayout
-            android:id="@+id/emptyState"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="32dp"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="☁️"
-                android:textSize="48sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
                 android:layout_marginTop="12dp"
-                android:text="@string/empty_title"
-                android:textColor="@color/aria_text"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="14dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/empty_sub"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="13sp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/emptyAddButton"
-                android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_circle_orange"
+                        android:gravity="center"
+                        android:text="👥"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/group_download"
+                            android:textColor="@color/aria_text"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/group_download_desc"
+                            android:textColor="@color/aria_text_dim"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <FrameLayout
+                        android:layout_width="78dp"
+                        android:layout_height="74dp"
+                        android:layout_marginStart="8dp">
+
+                        <View
+                            android:layout_width="58dp"
+                            android:layout_height="58dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_group_badge"
+                            android:rotation="8" />
+
+                        <View
+                            android:layout_width="58dp"
+                            android:layout_height="58dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_group_badge"
+                            android:rotation="-8" />
+
+                        <TextView
+                            android:layout_width="58dp"
+                            android:layout_height="58dp"
+                            android:layout_gravity="center"
+                            android:gravity="center"
+                            android:rotation="-8"
+                            android:text="@string/group_badge"
+                            android:textColor="@color/aria_primary"
+                            android:textSize="24sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="top|start"
+                            android:text="✨"
+                            android:textSize="12sp" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/groupAddButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_group_button"
+                    android:text="@string/group_add"
+                    android:textColor="@color/aria_primary_dark"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@null" />
+            </LinearLayout>
+
+            <!-- Recent links -->
+            <LinearLayout
+                android:id="@+id/recentSection"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:text="@string/add_downloads" />
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/recent_links"
+                        android:textColor="@color/aria_text"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/recentSeeAll"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:padding="4dp"
+                        android:text="@string/see_all"
+                        android:textColor="@color/aria_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:clipToPadding="false"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/recentLinksRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+            </LinearLayout>
+
+            <!-- Download queue -->
+            <LinearLayout
+                android:id="@+id/queueSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/queueTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/queue_title"
+                        android:textColor="@color/aria_text"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/queueSeeAll"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:padding="4dp"
+                        android:text="@string/see_all"
+                        android:textColor="@color/aria_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false"
+                    android:overScrollMode="never"
+                    android:paddingStart="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="4dp" />
+
+                <LinearLayout
+                    android:id="@+id/emptyState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="28dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="☁️"
+                        android:textSize="48sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/empty_title"
+                        android:textColor="@color/aria_text"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center"
+                        android:text="@string/empty_sub"
+                        android:textColor="@color/aria_text_dim"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/emptyAddButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:text="@string/add_downloads" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
-    </FrameLayout>
+    </androidx.core.widget.NestedScrollView>
 
     <LinearLayout
         android:id="@+id/selectionBar"
@@ -624,39 +701,15 @@
             android:textColor="@color/aria_red" />
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/statsBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/aria_surface"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="6dp">
-
-        <TextView
-            android:id="@+id/statsText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="@color/aria_text_dim"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/storageText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/aria_text_dim"
-            android:textSize="11sp" />
-    </LinearLayout>
-
     <!-- Bottom navigation -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_bottom_nav"
-        android:gravity="center_vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="8dp"
+        android:gravity="bottom"
         android:orientation="horizontal"
         android:paddingStart="8dp"
         android:paddingTop="8dp"
@@ -672,12 +725,14 @@
             android:orientation="vertical">
 
             <ImageView
+                android:id="@+id/navHomeIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:contentDescription="@string/nav_home"
                 android:src="@drawable/ic_home" />
 
             <TextView
+                android:id="@+id/navHomeLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -696,12 +751,14 @@
             android:orientation="vertical">
 
             <ImageView
+                android:id="@+id/navQueueIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:contentDescription="@string/nav_queue"
                 android:src="@drawable/ic_queue" />
 
             <TextView
+                android:id="@+id/navQueueLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -710,32 +767,28 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <LinearLayout
+        <FrameLayout
             android:id="@+id/navAdd"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:clipChildren="false"
+            android:clipToPadding="false">
 
             <TextView
-                android:layout_width="52dp"
-                android:layout_height="52dp"
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="-26dp"
                 android:background="@drawable/bg_circle_orange"
+                android:contentDescription="@string/add_download_fab"
+                android:elevation="10dp"
                 android:gravity="center"
                 android:text="+"
                 android:textColor="#FFFFFF"
-                android:textSize="28sp"
+                android:textSize="30sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/add_downloads"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
-        </LinearLayout>
+        </FrameLayout>
 
         <LinearLayout
             android:id="@+id/navDownloads"
@@ -746,12 +799,14 @@
             android:orientation="vertical">
 
             <ImageView
+                android:id="@+id/navDownloadsIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:contentDescription="@string/nav_downloads"
                 android:src="@drawable/ic_downloads_nav" />
 
             <TextView
+                android:id="@+id/navDownloadsLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -769,12 +824,14 @@
             android:orientation="vertical">
 
             <ImageView
+                android:id="@+id/navProfileIcon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:contentDescription="@string/nav_profile"
                 android:src="@drawable/ic_profile" />
 
             <TextView
+                android:id="@+id/navProfileLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"

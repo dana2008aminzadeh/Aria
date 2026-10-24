@@ -7,13 +7,16 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.os.StatFs
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -30,8 +33,10 @@ import ir.aria.downloader.data.FileSaver
 import ir.aria.downloader.databinding.ActivityMainBinding
 import ir.aria.downloader.databinding.DialogDetailsBinding
 import ir.aria.downloader.databinding.DialogRenameBinding
+import ir.aria.downloader.databinding.ItemRecentLinkBinding
 import ir.aria.downloader.model.DownloadItem
 import ir.aria.downloader.model.DownloadStatus
+import ir.aria.downloader.net.MimeTypes
 import ir.aria.downloader.service.DownloadService
 import ir.aria.downloader.service.NotificationSupport
 import ir.aria.downloader.util.Formats
@@ -48,8 +53,8 @@ class MainActivity : AppCompatActivity() {
     private var allItems: List<DownloadItem> = emptyList()
     private val selected = linkedSetOf<Long>()
     private var filter = Filter.ALL
-    private var query = ""
     private var lastServiceEnsure = 0L
+    private var lastRecentKey = ""
 
     private val addLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -69,13 +74,12 @@ class MainActivity : AppCompatActivity() {
 
         setupHeader()
         setupList()
-        setupFilters()
-        setupSearch()
         setupSelectionBar()
 
         binding.emptyAddButton.setOnClickListener { openAddScreen() }
 
         setupHome()
+        updateNavSelection()
         observeQueue()
         requestPermissionsIfNeeded()
     }
@@ -160,28 +164,52 @@ class MainActivity : AppCompatActivity() {
         binding.shortcutSpotify.setOnClickListener { openAddScreen(platformHint = "لینک اسپاتیفای را وارد کنید") }
         binding.shortcutInstagram.setOnClickListener { openAddScreen(platformHint = "لینک اینستاگرام را وارد کنید") }
         binding.shortcutPornhub.setOnClickListener { openAddScreen(platformHint = "لینک Pornhub را وارد کنید") }
-        binding.navHome.setOnClickListener { setFilter(Filter.ALL) }
-        binding.navQueue.setOnClickListener { setFilter(Filter.ACTIVE) }
-        binding.navDownloads.setOnClickListener { setFilter(Filter.COMPLETED) }
+        binding.navHome.setOnClickListener {
+            setFilter(Filter.ALL)
+            binding.homeScroll.smoothScrollTo(0, 0)
+        }
+        binding.navQueue.setOnClickListener { setFilter(Filter.ACTIVE, scrollToQueue = true) }
+        binding.navDownloads.setOnClickListener { setFilter(Filter.COMPLETED, scrollToQueue = true) }
         binding.navAdd.setOnClickListener { openAddScreen() }
         binding.navProfile.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
+        binding.queueSeeAll.setOnClickListener { setFilter(Filter.ALL, scrollToQueue = true) }
+        binding.recentSeeAll.setOnClickListener { setFilter(Filter.COMPLETED, scrollToQueue = true) }
     }
 
-    private fun setFilter(newFilter: Filter) {
+    private fun setFilter(newFilter: Filter, scrollToQueue: Boolean = false) {
         filter = newFilter
-        val chipId = when (newFilter) {
-            Filter.ALL -> R.id.chipAll
-            Filter.ACTIVE -> R.id.chipActive
-            Filter.COMPLETED -> R.id.chipCompleted
-            Filter.PAUSED -> R.id.chipPaused
-            Filter.FAILED -> R.id.chipFailed
-        }
-        binding.filterChips.check(chipId)
         clearSelection()
         refreshList()
-        binding.recycler.scrollToPosition(0)
+        updateNavSelection()
+        binding.queueTitle.setText(
+            when (newFilter) {
+                Filter.COMPLETED -> R.string.nav_downloads
+                else -> R.string.queue_title
+            }
+        )
+        if (scrollToQueue) {
+            binding.homeScroll.post {
+                binding.homeScroll.smoothScrollTo(0, binding.queueSection.top)
+            }
+        }
+    }
+
+    private fun updateNavSelection() {
+        val active = ContextCompat.getColor(this, R.color.aria_primary)
+        val dim = ContextCompat.getColor(this, R.color.aria_text_dim)
+
+        fun style(icon: ImageView, label: TextView, isActive: Boolean) {
+            val color = if (isActive) active else dim
+            icon.imageTintList = ColorStateList.valueOf(color)
+            label.setTextColor(color)
+        }
+
+        style(binding.navHomeIcon, binding.navHomeLabel, filter == Filter.ALL)
+        style(binding.navQueueIcon, binding.navQueueLabel, filter == Filter.ACTIVE)
+        style(binding.navDownloadsIcon, binding.navDownloadsLabel, filter == Filter.COMPLETED)
+        style(binding.navProfileIcon, binding.navProfileLabel, false)
     }
 
     private fun setupList() {
@@ -198,32 +226,6 @@ class MainActivity : AppCompatActivity() {
         )
         binding.recycler.layoutManager = LinearLayoutManager(this)
         binding.recycler.adapter = adapter
-    }
-
-    private fun setupFilters() {
-        binding.filterChips.setOnCheckedStateChangeListener { _, checkedIds ->
-            filter = when (checkedIds.firstOrNull()) {
-                R.id.chipActive -> Filter.ACTIVE
-                R.id.chipCompleted -> Filter.COMPLETED
-                R.id.chipPaused -> Filter.PAUSED
-                R.id.chipFailed -> Filter.FAILED
-                else -> Filter.ALL
-            }
-            clearSelection()
-            refreshList()
-        }
-    }
-
-    private fun setupSearch() {
-        binding.searchInput.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                query = s?.toString()?.trim().orEmpty()
-                refreshList()
-            }
-
-            override fun afterTextChanged(s: android.text.Editable?) = Unit
-        })
     }
 
     private fun setupSelectionBar() {
@@ -249,7 +251,7 @@ class MainActivity : AppCompatActivity() {
                     selected.retainAll(items.map { it.id }.toSet())
                     if (selected.isEmpty() && selectionMode()) exitSelection()
                     refreshList()
-                    updateHeader(items)
+                    updateRecentLinks(items)
                     updateSelectionUi()
                     if (items.any { it.status == DownloadStatus.QUEUED }) ensureServiceRunning()
                 }
@@ -269,12 +271,6 @@ class MainActivity : AppCompatActivity() {
                     Filter.FAILED -> item.status == DownloadStatus.FAILED
                 }
             }
-            .filter { item ->
-                query.isEmpty() ||
-                    item.fileName.contains(query, true) ||
-                    item.url.contains(query, true) ||
-                    (item.title?.contains(query, true) == true)
-            }
             .sortedWith(compareBy({ statusRank(it.status) }, { -it.createdAt }))
             .toList()
         adapter.submitList(filtered)
@@ -290,38 +286,56 @@ class MainActivity : AppCompatActivity() {
         DownloadStatus.COMPLETED -> 5
     }
 
-    private fun updateHeader(items: List<DownloadItem>) {
-        val summary = repo.summary()
-        val showCard = summary.activeCount > 0 || summary.queuedCount > 0
-        binding.aggregateCard.visibility = if (showCard) View.VISIBLE else View.GONE
-        if (showCard) {
-            binding.aggregateTitle.text = if (summary.activeCount > 0) {
-                getString(R.string.downloads_running, summary.activeCount)
-            } else {
-                getString(R.string.queued)
-            }
-            binding.aggregateSpeed.text = Formats.speed(summary.aggregateSpeed)
-            val progress = summary.aggregateProgress
-            if (progress != null) {
-                binding.aggregateProgress.isIndeterminate = false
-                binding.aggregateProgress.progress = progress
-            } else {
-                binding.aggregateProgress.isIndeterminate = true
-            }
+    /** Fills the horizontal "لینک‌های اخیر" row with the most recent items. */
+    private fun updateRecentLinks(items: List<DownloadItem>) {
+        val recent = items.sortedByDescending { it.createdAt }.take(6)
+        binding.recentSection.visibility = if (recent.isEmpty()) View.GONE else View.VISIBLE
+        // The repository flow emits on every progress tick; only rebuild the row
+        // when the visible content actually changed.
+        val key = recent.joinToString("|") { item ->
+            val bytes = if (item.totalBytes > 0) item.totalBytes else item.downloadedBytes
+            "${item.id}:${item.fileName}:${Formats.bytes(bytes)}"
         }
-
-        val completedBytes = items.filter { it.status == DownloadStatus.COMPLETED }
-            .sumOf { it.downloadedBytes }
-        binding.statsText.text = getString(R.string.stats, items.size, Formats.bytes(completedBytes))
-        binding.storageText.text = getString(R.string.storage_free, Formats.bytes(freeStorage()))
+        if (key == lastRecentKey) return
+        lastRecentKey = key
+        binding.recentLinksRow.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+        for (item in recent) {
+            val card = ItemRecentLinkBinding.inflate(inflater, binding.recentLinksRow, false)
+            card.recentTitle.text = item.title?.takeIf { it.isNotBlank() } ?: item.fileName
+            card.recentDomain.text = hostOf(item.url)
+            val bytes = if (item.totalBytes > 0) item.totalBytes else item.downloadedBytes
+            card.recentSize.text = if (bytes > 0) Formats.bytes(bytes) else getString(R.string.unknown_size)
+            card.recentIcon.text = iconFor(item)
+            val badge = PlatformBadge.of(item.url)
+            card.recentBadge.text = badge.symbol
+            card.recentBadge.setBackgroundResource(badge.background)
+            card.recentBadge.setTextColor(ContextCompat.getColor(this, badge.textColor))
+            card.root.setOnClickListener {
+                val current = allItems.firstOrNull { it.id == item.id } ?: item
+                if (current.status == DownloadStatus.COMPLETED) openItem(current) else showDetails(current)
+            }
+            binding.recentLinksRow.addView(card.root)
+        }
     }
 
-    private fun freeStorage(): Long = try {
-        val stat = StatFs(Environment.getDataDirectory().absolutePath)
-        stat.availableBlocksLong * stat.blockSizeLong
+    private fun hostOf(url: String): String = try {
+        Uri.parse(url).host?.removePrefix("www.").orEmpty()
     } catch (e: Exception) {
-        -1L
+        ""
     }
+
+    private fun iconFor(item: DownloadItem): String =
+        when (MimeTypes.categoryOf(item.mimeType, item.fileName)) {
+            MimeTypes.Category.VIDEO -> "🎬"
+            MimeTypes.Category.AUDIO -> "🎵"
+            MimeTypes.Category.IMAGE -> "🖼️"
+            MimeTypes.Category.PDF -> "📕"
+            MimeTypes.Category.ARCHIVE -> "📦"
+            MimeTypes.Category.APP -> "📱"
+            MimeTypes.Category.TEXT -> "📝"
+            MimeTypes.Category.OTHER -> "📄"
+        }
 
     // ------------------------------------------------------------------ selection
 

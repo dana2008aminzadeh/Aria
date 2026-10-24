@@ -9,7 +9,6 @@
     <string name="completed">تکمیل‌شده</string>
     <string name="failed">ناموفق</string>
     <string name="paused">متوقف</string>
-    <string name="search_hint">جست‌وجو…</string>
     <string name="url_hint">لینک فایل یا صفحهٔ ویدیو را وارد کنید (هر خط یک لینک)</string>
     <string name="paste">چسباندن از کلیپ‌بورد</string>
     <string name="choose_file">انتخاب فایل متنی</string>
@@ -70,10 +69,9 @@
     <string name="error_open_file">برنامه‌ای برای باز کردن این فایل پیدا نشد</string>
     <string name="deleted">حذف شد</string>
     <string name="rename_hint">نام جدید فایل</string>
-    <string name="stats">%1$d دانلود • %2$s</string>
     <string name="select_mode">حالت انتخاب</string>
     <string name="batch_pattern_hint">الگو: https://site.com/file{1-10}.jpg</string>
-    <string name="about_text">مدیریت دانلود کامل با دو موتور: دانلود مستقیم (HTTP با ادامهٔ دانلود) و موتور استخراج yt-dlp برای بیش از هزار سایت ویدیو/موسیقی (یوتیوب، اینستاگرام، تیک‌تاک، ساندکلاد، توییتر، پورن‌هاب و…). برای دانلود فقط از محتوایی استفاده کنید که اجازه یا مالکیت آن را دارید.</string>
+    <string name="about_text">آریا دانلودر؛ دانلود سریع از لینک مستقیم و بیش از هزار سایت ویدیو و موسیقی مثل یوتیوب، اینستاگرام، تیک‌تاک و ساندکلاد، با کیفیت دلخواه. فقط محتوایی را دانلود کنید که اجازه یا مالکیت آن را دارید.</string>
     <string name="clear">پاک کردن</string>
     <string name="done">تمام</string>
     <string name="queue_info">%1$s از %2$s</string>
@@ -99,20 +97,7 @@
     <string name="format_conversion_note">خروجی‌های تبدیلی با FFmpeg ساخته می‌شوند؛ تبدیل زمان و باتری مصرف می‌کند و کیفیت از دست‌رفتهٔ منبع را برنمی‌گرداند.</string>
     <string name="add_to_queue">افزودن به صف</string>
     <string name="media_hint">لینک صفحه یا اشتراک‌گذاری یوتیوب، اسپاتیفای، آپارات، اینستاگرام، تیک‌تاک، Pornhub و سایت‌های دیگر را وارد کنید؛ برنامه لینک را استاندارد و فایل اصلی را پیدا می‌کند.</string>
-    <string name="engine_title">موتور استخراج</string>
-    <string name="engine_ytdlp">yt-dlp</string>
-    <string name="engine_python">Python</string>
-    <string name="engine_missing">در دسترس نیست</string>
-    <string name="open_source_licenses">مجوزهای متن‌باز و FFmpeg</string>
-    <string name="cookies_title">کوکی (cookies.txt)</string>
-    <string name="cookies_desc">فقط برای محتوای خصوصی یا واقعاً نیازمند ورود. برای لینک‌های عمومی اینستاگرام ابتدا مسیر بدون کوکی و Embed عمومی استفاده می‌شود.</string>
-    <string name="cookies_import">وارد کردن cookies.txt</string>
-    <string name="cookies_delete">حذف کوکی‌ها</string>
-    <string name="cookies_present">کوکی‌ها وارد شده‌اند</string>
-    <string name="cookies_absent">کوکی‌ای ثبت نشده</string>
-    <string name="cookies_imported">فایل کوکی ذخیره شد</string>
-    <string name="cookies_invalid">این فایل شبیه cookies.txt نیست</string>
-    <string name="cookies_removed">کوکی‌ها حذف شدند</string>
+    <string name="open_source_licenses">مجوزهای متن‌باز</string>
     <string name="preparing">در حال بررسی لینک‌ها…</string>
     <string name="ingest_report">%1$d مورد اضافه شد</string>
     <string name="ingest_warnings">هشدارها: %1$s</string>
@@ -120,10 +105,8 @@
     <string name="spotify_failed">اسپاتیفای: %1$s</string>
     <string name="merge_failed_warning">ادغام تصویر و صدا ناموفق بود؛ ویدیو بدون صدا ذخیره شد</string>
     <string name="media_processing_failed">ساخت خروجی انتخاب‌شده با FFmpeg ناموفق بود. خروجی دیگری مانند MKV یا M4A را امتحان کنید؛ فایل با پسوند جعلی ذخیره نشد.</string>
-    <string name="media_badge">ویدیو</string>
     <string name="extractor_label">منبع: %1$s</string>
     <string name="warning_label">توجه: %1$s</string>
-    <string name="onlyfans_note">توجه: سرویس‌های دارای پرداخت/DRM مانند OnlyFans و اسپاتیفای فایل قابل دانلود نمی‌دهند. اسپاتیفای از طریق تطبیق آهنگ با منبع باز پخش می‌شود؛ OnlyFans پشتیبانی نمی‌شود.</string>
     <string name="supported_title">سایت‌های پشتیبانی‌شده</string>
     <string name="supported_body">یوتیوب و یوتیوب موزیک، اینستاگرام، تیک‌تاک، توییتر/X، فیس‌بوک، ویمیو، دیلی‌موشن، ساندکلاد، بندکمپ، توییچ، ردیت، پینترست، لینکدین، بیلبیلی، رامبل، آپارات، نماوا، تلوبیون، آرشیو، پورن‌هاب و صدها سایت دیگر (بیش از ۱۰۰۰ سایت).</string>
     <string name="playlist_detected">پلی‌لیست: %1$d مورد پیدا شد</string>
@@ -131,8 +114,8 @@
     <string name="preset_saved">کیفیت پیش‌فرض ذخیره شد</string>
     <string name="default_quality">کیفیت پیش‌فرض در حالت fallback</string>
     <string name="default_quality_fallback">انتخاب اصلی هنگام افزودن هر لینک انجام می‌شود؛ این مقدار فقط وقتی سایت فهرست فرمت ندهد استفاده می‌شود.</string>
-    <string name="proxy_title">پروکسی موتور رسانه (اختیاری)</string>
-    <string name="proxy_description">برای محدودیت شبکه و خطای Connection refused در سایت‌هایی مانند Pornhub. روی خواندن فرمت، جست‌وجو و دانلود yt-dlp اعمال می‌شود. خالی یعنی اتصال مستقیم؛ تغییر VPN/پروکسی سیستم هم ممکن است لازم باشد.</string>
+    <string name="proxy_title">پروکسی (اختیاری)</string>
+    <string name="proxy_description">اگر برخی سایت‌ها در شبکهٔ شما باز نمی‌شوند، آدرس پروکسی را اینجا وارد کنید. خالی یعنی اتصال مستقیم.</string>
     <string name="proxy_save">ذخیره پروکسی</string>
     <string name="proxy_saved">پروکسی ذخیره شد</string>
     <string name="proxy_cleared">پروکسی حذف شد</string>
@@ -163,4 +146,7 @@
     <string name="nav_queue">صف دانلود</string>
     <string name="nav_downloads">دانلودها</string>
     <string name="nav_profile">پروفایل</string>
+    <string name="group_badge">20</string>
+    <string name="hero_art_desc">دانلود از همه پلتفرم‌ها</string>
+    <string name="add_download_fab">افزودن دانلود</string>
 </resources>
