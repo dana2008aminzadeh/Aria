@@ -1,5 +1,5 @@
 """
-AllDown 5.2.0 - extraction engine.
+AllDown 5.3.0 - extraction engine.
 
 This file is shipped inside the APK and executed by Chaquopy (CPython 3.13 on Android).
 It is also run by the plain CPython interpreter in the test suite, so the code that is
@@ -36,7 +36,7 @@ import yt_dlp  # noqa: E402  (must come after the SSL env vars)
 from yt_dlp.networking import Request  # noqa: E402
 from yt_dlp.networking._urllib import UrllibRH  # noqa: E402
 
-ENGINE_VERSION = "5.2.0"
+ENGINE_VERSION = "5.3.0"
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular
@@ -724,8 +724,78 @@ def _instagram_public_embed(ydl, url):
     return _parse_instagram_public_embed(page, shortcode, url)
 
 
+_SHORT_SHARE_HOSTS = ("pin.it",)
+
+
+def _needs_redirect_resolution(url):
+    """App share links that only match yt-dlp's generic extractor.
+
+    pin.it short links and Reddit /s/ share tokens carry no post id at all, so the
+    dedicated extractors never see them until the redirect is followed.
+    """
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception:
+        return False
+    host = (parsed.hostname or "").lower()
+    if host in _SHORT_SHARE_HOSTS:
+        return True
+    return host.endswith("reddit.com") and "/s/" in (parsed.path or "")
+
+
+def _follow_redirect(ydl, url):
+    try:
+        resp = ydl.urlopen(Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36",
+        }))
+        try:
+            final = resp.geturl()
+        except Exception:
+            final = getattr(resp, "url", None)
+        try:
+            resp.close()
+        except Exception:
+            pass
+        return final if isinstance(final, str) and final.startswith("http") else None
+    except Exception:
+        return None
+
+
+def _image_direct_url(info, rows):
+    """A downloadable image for image-only posts (Pinterest pins, Reddit/TikTok photos).
+
+    Video/audio extractors return no formats for these, which the app used to report
+    as "no format found" even though the image itself is right there.
+    """
+    if rows:
+        return None
+    candidates = []
+    direct = info.get("url")
+    if isinstance(direct, str):
+        candidates.append((0, direct))
+    for thumb in info.get("thumbnails") or []:
+        if isinstance(thumb, dict) and thumb.get("url"):
+            area = (thumb.get("width") or 0) * (thumb.get("height") or 0)
+            candidates.append((area, thumb["url"]))
+    if info.get("thumbnail"):
+        candidates.append((0, info["thumbnail"]))
+    for _, candidate in sorted(candidates, reverse=True):
+        ext = candidate.split("?")[0].rsplit(".", 1)[-1].lower() if "." in candidate else ""
+        if ext in ("jpg", "jpeg", "png", "webp", "gif", "avif"):
+            return candidate
+    return None
+
+
 def _extract_info(ydl, url, download=False):
     """Uses yt-dlp first, then Instagram's public embed only as a no-login fallback."""
+    if _needs_redirect_resolution(url):
+        final = _follow_redirect(ydl, url)
+        if final and final != url:
+            try:
+                return ydl.extract_info(final, download=download)
+            except Exception as exc:
+                if exc.__class__.__name__ in ("_Cancelled", "DownloadCancelled"):
+                    raise
     try:
         return ydl.extract_info(url, download=download)
     except Exception as exc:
@@ -813,6 +883,7 @@ def probe(url, options_json="{}"):
             "webpage_url": info.get("webpage_url") or url,
             "extractor": info.get("extractor_key") or info.get("extractor") or "",
             "is_live": bool(info.get("is_live")),
+            "direct_file_url": _image_direct_url(info, rows),
             "formats": _public_formats(rows),
             "best_height": max([r["height"] or 0 for r in rows if r["has_video"]] or [0]),
             "has_audio_only": any(r["audio_only"] for r in rows),

@@ -43,7 +43,7 @@ object UrlClassifier {
         "pornhubpremium.com", "pornhubpremium.net", "pornhubpremium.org",
         "xvideos.com", "xhamster.com", "redtube.com", "youporn.com",
         "bilibili.com", "rumble.com", "odysee.com", "streamable.com", "imgur.com",
-        "pinterest.com", "linkedin.com", "snapchat.com", "vk.com", "ok.ru",
+        "pinterest.com", "pin.it", "linkedin.com", "snapchat.com", "vk.com", "ok.ru",
         "archive.org", "mixcloud.com", "audiomack.com", "likee.video", "kwai.com",
         "aparat.com", "namasha.com", "filimo.com", "telewebion.com",
         "ted.com", "bbc.co.uk", "cnn.com", "spotify.com", "open.spotify.com"

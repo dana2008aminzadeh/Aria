@@ -174,6 +174,28 @@ class LinkIngestor(
                             if (probe.entries.size > 1) {
                                 warnings.add("پلی‌لیست «${probe.title}»: ${probe.entries.size} مورد پیدا شد.")
                             }
+                        } else if (probe.formats.isEmpty() && !probe.directFileUrl.isNullOrBlank()) {
+                            // Image-only post (Pinterest pin / Reddit / TikTok photo):
+                            // there is no video stream, so save the image itself directly.
+                            val imageUrl = probe.directFileUrl
+                            val imageExt = UrlClassifier.extensionOf(imageUrl).ifBlank { "jpg" }
+                            requests.add(
+                                NewDownload(
+                                    url = imageUrl,
+                                    fileName = FileNames.sanitize(
+                                        probe.title.ifBlank { "image" }, "image"
+                                    ) + "." + imageExt,
+                                    engine = EngineKind.HTTP,
+                                    mimeType = when (imageExt) {
+                                        "png" -> "image/png"
+                                        "webp" -> "image/webp"
+                                        "gif" -> "image/gif"
+                                        else -> "image/jpeg"
+                                    },
+                                    extractor = probe.extractor
+                                )
+                            )
+                            warnings.add("این پست فقط عکس است؛ خودِ عکس دانلود می‌شود.")
                         } else {
                             var request: NewDownload? = null
                             if (chooser != null && probe.formats.isNotEmpty()) {
