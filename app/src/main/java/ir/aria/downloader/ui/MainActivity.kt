@@ -183,12 +183,7 @@ class MainActivity : AppCompatActivity() {
             binding.shortcutTiktok to "لینک TikTok را وارد کنید",
             binding.shortcutX to "لینک X را وارد کنید",
             binding.shortcutFacebook to "لینک فیس‌بوک را وارد کنید",
-            binding.shortcutAparat to "لینک آپارات را وارد کنید",
             binding.shortcutSoundcloud to "لینک SoundCloud را وارد کنید",
-            binding.shortcutVimeo to "لینک Vimeo را وارد کنید",
-            binding.shortcutTwitch to "لینک Twitch را وارد کنید",
-            binding.shortcutPinterest to "لینک Pinterest را وارد کنید",
-            binding.shortcutReddit to "لینک Reddit را وارد کنید",
             binding.shortcutPornhub to "لینک Pornhub را وارد کنید"
         )
         for ((view, hint) in shortcuts) {

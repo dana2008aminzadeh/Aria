@@ -85,6 +85,36 @@ class MediaUrlNormalizerTest {
     }
 
     @Test
+    fun redditShortAndCommentLinksBecomeCanonical() {
+        assertEquals(
+            "https://www.reddit.com/comments/abc123/",
+            MediaUrlNormalizer.normalize("https://redd.it/abc123")
+        )
+        assertEquals(
+            "https://www.reddit.com/comments/abc123/",
+            MediaUrlNormalizer.normalize("https://old.reddit.com/r/videos/comments/abc123/some-title/?utm=share")
+        )
+        val share = "https://www.reddit.com/r/videos/s/AbC123xYz"
+        assertEquals(share, MediaUrlNormalizer.normalize(share))
+    }
+
+    @Test
+    fun pinterestAnyTldAndVimeoPlayerLinksBecomeCanonical() {
+        assertEquals(
+            "https://www.pinterest.com/pin/123456789/",
+            MediaUrlNormalizer.normalize("https://www.pinterest.co.uk/pin/123456789/?utm_source=share")
+        )
+        assertEquals(
+            "https://vimeo.com/123456789",
+            MediaUrlNormalizer.normalize("https://player.vimeo.com/video/123456789?h=abc")
+        )
+        assertEquals(
+            "https://www.twitch.tv/videos/123456789",
+            MediaUrlNormalizer.normalize("https://m.twitch.tv/videos/123456789")
+        )
+    }
+
+    @Test
     fun unrelatedLinksAreNotModified() {
         val url = "https://www.youtube.com/watch?v=aqz-KE-bpKQ&t=10"
         assertEquals(url, MediaUrlNormalizer.normalize(url))
