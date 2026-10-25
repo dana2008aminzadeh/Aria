@@ -72,7 +72,9 @@ class ExtractorEngine private constructor(
         val entries: List<PlaylistEntry> = emptyList(),
         val formats: List<FormatRow> = emptyList(),
         val bestHeight: Int = 0,
-        val hasAudioOnly: Boolean = false
+        val hasAudioOnly: Boolean = false,
+        /** Direct image file for image-only posts (Pinterest pins, Reddit/TikTok photos). */
+        val directFileUrl: String? = null
     )
 
     data class Plan(
