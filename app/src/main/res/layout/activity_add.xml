@@ -62,25 +62,27 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/pasteButton"
-                    style="@style/Widget.Material3.Button.TextButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:text="@string/paste" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/fileButton"
-                    style="@style/Widget.Material3.Button.TextButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="6dp"
                     android:layout_weight="1"
                     android:text="@string/choose_file" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/clearButton"
-                    style="@style/Widget.Material3.Button.TextButton"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="52dp"
                     android:layout_weight="1"
                     android:text="@string/clear" />
             </LinearLayout>
@@ -105,17 +107,6 @@
                 android:visibility="gone"
                 tools:text="در حال بررسی لینک‌ها…"
                 tools:visibility="visible" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:background="@drawable/clay_block_blue"
-                android:padding="14dp"
-                android:text="@string/per_item_quality_hint"
-                android:textColor="@color/aria_on_pastel"
-                android:textSize="12sp"
-                android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"

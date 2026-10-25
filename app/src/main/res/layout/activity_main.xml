@@ -173,40 +173,45 @@
         android:textStyle="bold" />
 
     <LinearLayout
+        android:id="@+id/shortcutGrid"
+        android:layoutAnimation="@anim/layout_fall_down"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="12dp"
+        android:layout_marginStart="7dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="7dp"
+        android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="horizontal">
-
         <LinearLayout
             android:id="@+id/shortcutDirect"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_margin="5dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
             android:elevation="6dp"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="12dp">
 
             <ImageView
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:background="@drawable/block_direct"
-                android:padding="10dp"
+                android:padding="13dp"
                 android:src="@drawable/ic_link" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/shortcut_direct"
+                android:layout_marginTop="8dp"
+                android:text="سایر لینک‌ها"
                 android:textColor="@color/aria_text"
-                android:textSize="10sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -214,73 +219,35 @@
                 android:layout_height="wrap_content"
                 android:text="مستقیم"
                 android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
+                android:textSize="11sp" />
         </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/shortcutInstagram"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_shortcut"
-            android:elevation="6dp"
-            android:foreground="?attr/selectableItemBackground"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="8dp">
-
-            <ImageView
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/block_instagram"
-                android:padding="10dp"
-                android:src="@drawable/ic_brand_instagram" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Instagram"
-                android:textColor="@color/aria_text"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="اینستاگرام"
-                android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
-        </LinearLayout>
-
         <LinearLayout
             android:id="@+id/shortcutYoutube"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_margin="5dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
             android:elevation="6dp"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="12dp">
 
             <ImageView
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:background="@drawable/block_youtube"
-                android:padding="10dp"
+                android:padding="13dp"
                 android:src="@drawable/ic_brand_youtube" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:text="YouTube"
                 android:textColor="@color/aria_text"
-                android:textSize="10sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -288,36 +255,35 @@
                 android:layout_height="wrap_content"
                 android:text="یوتیوب"
                 android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
+                android:textSize="11sp" />
         </LinearLayout>
-
         <LinearLayout
             android:id="@+id/shortcutSpotify"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_margin="5dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
             android:elevation="6dp"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="12dp">
 
             <ImageView
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:background="@drawable/block_spotify"
-                android:padding="10dp"
+                android:padding="13dp"
                 android:src="@drawable/ic_brand_spotify" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:text="Spotify"
                 android:textColor="@color/aria_text"
-                android:textSize="10sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -325,38 +291,410 @@
                 android:layout_height="wrap_content"
                 android:text="اسپاتیفای"
                 android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
+                android:textSize="11sp" />
         </LinearLayout>
-
         <LinearLayout
-            android:id="@+id/shortcutPornhub"
+            android:id="@+id/shortcutInstagram"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_margin="5dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
             android:elevation="6dp"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_instagram"
+                android:padding="13dp"
+                android:src="@drawable/ic_brand_instagram" />
 
             <TextView
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/block_pornhub"
-                android:gravity="center"
-                android:text="PH"
-                android:textColor="#FF9000"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Instagram"
+                android:textColor="@color/aria_text"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:text="اینستاگرام"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:id="@+id/shortcutTiktok"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_tiktok"
+                android:padding="13dp"
+                android:src="@drawable/ic_link" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="TikTok"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="تیک‌تاک"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/shortcutX"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_x"
+                android:padding="13dp"
+                android:src="@drawable/ic_link" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="X"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ایکس"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/shortcutFacebook"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_facebook"
+                android:padding="13dp"
+                android:src="@drawable/ic_link" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Facebook"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="فیس‌بوک"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/shortcutAparat"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_aparat"
+                android:padding="13dp"
+                android:src="@drawable/ic_link" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Aparat"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="آپارات"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:id="@+id/shortcutSoundcloud"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_soundcloud"
+                android:padding="13dp"
+                android:src="@drawable/ic_file_audio" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="SoundCloud"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ساندکلاد"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/shortcutVimeo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_vimeo"
+                android:padding="13dp"
+                android:src="@drawable/ic_file_video" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Vimeo"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ویمئو"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/shortcutTwitch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_twitch"
+                android:padding="13dp"
+                android:src="@drawable/ic_file_video" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Twitch"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="توییچ"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/shortcutPinterest"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_pinterest"
+                android:padding="13dp"
+                android:src="@drawable/ic_file_image" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Pinterest"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="پینترست"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:id="@+id/shortcutReddit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_reddit"
+                android:padding="13dp"
+                android:src="@drawable/ic_link" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Reddit"
+                android:textColor="@color/aria_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ردیت"
+                android:textColor="@color/aria_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/shortcutPornhub"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_shortcut"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/block_pornhub"
+                android:padding="13dp"
+                android:src="@drawable/ic_link" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:text="Pornhub"
                 android:textColor="@color/aria_text"
-                android:textSize="10sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -364,8 +702,9 @@
                 android:layout_height="wrap_content"
                 android:text="پورن‌هاب"
                 android:textColor="@color/aria_text_dim"
-                android:textSize="9sp" />
+                android:textSize="11sp" />
         </LinearLayout>
+    </LinearLayout>
     </LinearLayout>
 
     <!-- Group download -->
@@ -532,17 +871,32 @@
         </com.google.android.material.chip.ChipGroup>
     </HorizontalScrollView>
 
-    <TextView
-        android:id="@+id/queueTitle"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="6dp"
-        android:layout_marginEnd="16dp"
-        android:text="@string/queue_title"
-        android:textColor="@color/aria_text"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/queueTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/recent_downloads"
+            android:textColor="@color/aria_text"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/seeAllButton"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/see_all" />
+    </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -553,6 +907,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:nestedScrollingEnabled="false"
+            android:layoutAnimation="@anim/layout_fall_down"
             android:clipToPadding="false"
             android:paddingStart="10dp"
             android:paddingTop="8dp"
@@ -654,33 +1009,6 @@
             android:layout_height="wrap_content"
             android:text="@string/delete"
             android:textColor="@color/aria_red" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/statsBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/aria_surface"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="6dp">
-
-        <TextView
-            android:id="@+id/statsText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="@color/aria_text_dim"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/storageText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/aria_text_dim"
-            android:textSize="11sp" />
     </LinearLayout>
 
     <!-- Bottom navigation -->
@@ -815,4 +1143,31 @@
                 android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
+    <LinearLayout
+        android:id="@+id/statsBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/aria_surface"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/statsText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/aria_text_dim"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/storageText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/aria_text_dim"
+            android:textSize="11sp" />
+    </LinearLayout>
+
 </LinearLayout>
