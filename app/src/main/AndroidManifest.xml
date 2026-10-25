@@ -70,6 +70,13 @@
             android:exported="false"
             android:parentActivityName=".ui.MainActivity" />
 
+        <!-- Log viewer/exporter. The screen itself is harmless in every build, but the
+             settings entry is only shown when BuildConfig.DIAGNOSTICS is true (diag build). -->
+        <activity
+            android:name=".ui.DiagnosticsActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.SettingsActivity" />
+
         <service
             android:name=".service.DownloadService"
             android:exported="false"

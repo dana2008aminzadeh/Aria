@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Diag build only: a visibly different name on the home screen so the tester
+         never confuses the bug-hunting build with the real app installed beside it. -->
+    <string name="app_name">AllDown دیباگ</string>
+</resources>

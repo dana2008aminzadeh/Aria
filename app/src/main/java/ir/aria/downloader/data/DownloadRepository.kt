@@ -5,6 +5,7 @@ import ir.aria.downloader.engine.EngineKind
 import ir.aria.downloader.engine.ExtractorEngine
 import ir.aria.downloader.engine.MediaUrlNormalizer
 import ir.aria.downloader.engine.UrlClassifier
+import ir.aria.downloader.diag.DiagLog
 import ir.aria.downloader.model.DownloadItem
 import ir.aria.downloader.model.DownloadStatus
 import ir.aria.downloader.net.FileNames
@@ -77,6 +78,14 @@ class DownloadRepository private constructor(context: Context) {
             if (item.status == DownloadStatus.COMPLETED) partFile(item.id).delete()
         }
         emit()
+        val all = store.all()
+        DiagLog.i(
+            "Queue",
+            "loaded " + all.size + " item(s): " +
+                DownloadStatus.values().joinToString(", ") { st ->
+                    st.name + "=" + all.count { it.status == st }
+                }
+        )
     }
 
     fun item(id: Long): DownloadItem? = store.get(id)
@@ -153,6 +162,22 @@ class DownloadRepository private constructor(context: Context) {
             store.upsert(item)
             existingActive.add(url)
             created.add(item)
+            DiagLog.i(
+                "Queue",
+                "added #" + item.id + " engine=" + item.engine + " preset=" + item.preset +
+                    " name='" + item.fileName + "' mime=" + item.mimeType +
+                    " extractor=" + item.extractor +
+                    " selection=[" + (item.selectionLabel ?: "") + "] fmt=" + item.formatId +
+                    " afmt=" + item.audioFormatId + " out=" + item.outputKind + "/" + item.outputExt +
+                    " url=" + DiagLog.redactUrl(item.url)
+            )
+        }
+        if (DiagLog.enabled && created.size != requests.size) {
+            DiagLog.w(
+                "Queue",
+                "addRequests: " + created.size + " of " + requests.size +
+                    " queued (duplicates/empty urls skipped)"
+            )
         }
         persist(force = true)
         emit()
@@ -164,6 +189,17 @@ class DownloadRepository private constructor(context: Context) {
     fun update(id: Long, persist: Boolean = false, transform: (DownloadItem) -> DownloadItem): DownloadItem? {
         val current = store.get(id) ?: return null
         val updated = transform(current)
+        if (DiagLog.enabled && updated.status != current.status) {
+            DiagLog.i(
+                "Queue",
+                "#" + id + " " + current.status + " -> " + updated.status +
+                    " downloaded=" + updated.downloadedBytes + "/" + updated.totalBytes +
+                    " attempts=" + updated.attempts + " pausedByUser=" + updated.pausedByUser +
+                    (updated.errorMessage?.let { " error='$it'" } ?: "") +
+                    (updated.warning?.let { " warning='$it'" } ?: "") +
+                    " name='" + updated.fileName + "'"
+            )
+        }
         store.upsert(updated)
         emit()
         if (persist) persist(force = true) else persist()
@@ -171,6 +207,12 @@ class DownloadRepository private constructor(context: Context) {
     }
 
     fun remove(id: Long): DownloadItem? {
+        val before = store.get(id)
+        DiagLog.i(
+            "Queue",
+            "remove #" + id + " status=" + before?.status + " name='" + before?.fileName + "'" +
+                " url=" + DiagLog.redactUrl(before?.url)
+        )
         val removed = store.remove(id)
         partFile(id).delete()
         mediaWorkDir(id).deleteRecursively()
@@ -197,6 +239,7 @@ class DownloadRepository private constructor(context: Context) {
     fun renameItem(id: Long, newName: String) {
         val current = store.get(id) ?: return
         val clean = FileNames.sanitize(newName, current.fileName)
+        DiagLog.i("Queue", "rename #$id '${current.fileName}' -> '$clean'")
         if (clean == current.fileName) return
         if (current.status == DownloadStatus.COMPLETED) {
             val newUri = FileSaver.rename(appContext, current, clean)

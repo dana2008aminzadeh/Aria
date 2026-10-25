@@ -11,6 +11,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import ir.aria.downloader.R
+import ir.aria.downloader.diag.DiagLog
 import ir.aria.downloader.engine.FormatOptions
 import ir.aria.downloader.engine.ExtractorEngine
 
@@ -25,7 +26,14 @@ object FormatChooserDialog {
         onResult: (ExtractorEngine.FormatSelection?) -> Unit
     ): AlertDialog? {
         val choices = FormatOptions.choices(formats, audioOnly)
+        DiagLog.i(
+            "Chooser",
+            "show title='" + title + "' audioOnly=$audioOnly formatRows=" + formats.size +
+                " choices=" + choices.size +
+                choices.joinToString("") { "\n choice: " + it.label + " | " + it.detail }
+        )
         if (choices.isEmpty()) {
+            DiagLog.w("Chooser", "no choices available -> null result")
             onResult(null)
             return null
         }
@@ -45,6 +53,13 @@ object FormatChooserDialog {
         fun finish(result: ExtractorEngine.FormatSelection?) {
             if (finished) return
             finished = true
+            DiagLog.i(
+                "Chooser",
+                "finish -> " + (result?.let {
+                    "fmt=" + it.formatId + " afmt=" + it.audioFormatId + " out=" + it.outputKind +
+                        "/" + it.outputExt + " abr=" + it.audioBitrateKbps + " label=[" + it.label + "]"
+                } ?: "null (cancelled/dismissed)")
+            )
             onResult(result)
         }
 
@@ -56,6 +71,7 @@ object FormatChooserDialog {
         formatSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, item: View?, position: Int, id: Long) {
                 selectedChoice = choices[position]
+                DiagLog.d("Chooser", "format picked [$position] " + selectedChoice.label)
                 outputs = FormatOptions.outputs(selectedChoice, audioOnly)
                 outputSpinner.adapter = OutputAdapter(context, outputs)
                 formatDetail.text = selectedChoice.detail
@@ -66,6 +82,7 @@ object FormatChooserDialog {
         }
         outputSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, item: View?, position: Int, id: Long) {
+                DiagLog.d("Chooser", "output picked [$position] " + outputs.getOrNull(position)?.label)
                 outputDetail.text = outputs.getOrNull(position)?.detail.orEmpty()
             }
 

@@ -14,6 +14,7 @@ Public API (everything is JSON so Kotlin can consume it directly):
     resolve(url, options_json)        -> json   (download plan for a quality preset)
     download(request_json, callback)  -> json   (blocking download, events via callback)
     search(query, limit)              -> json   (used by the Spotify bridge)
+    configure_diag(path)              -> json   (diag build: file every engine event is logged to)
 """
 
 import html as html_lib
@@ -24,6 +25,7 @@ import re
 import sys
 import threading
 import time
+import traceback
 import urllib.parse
 import urllib.request
 
@@ -40,6 +42,152 @@ from yt_dlp.networking import Request  # noqa: E402
 from yt_dlp.networking._urllib import UrllibRH  # noqa: E402
 
 ENGINE_VERSION = "5.4.0"
+
+# --------------------------------------------------------------------------- diagnostics
+#
+# Active only in the diag build: Kotlin passes {"diag": true, "diag_log_path": ...} in the
+# options of every call (and calls configure_diag(path) once after the runtime boots).
+# The python side then appends its own lines to the very same session file Kotlin writes,
+# so the tester ends up with ONE interleaved timeline: UI -> queue -> extraction (incl.
+# yt-dlp's verbose log) -> download -> FFmpeg. Without a diag path every helper below is a
+# no-op and yt-dlp keeps its quiet production options.
+
+_DIAG_PATH = ""
+_DIAG_LOCK = threading.Lock()
+
+# A bare "key" substring would also hide harmless content ids such as Pornhub's
+# "viewkey", so key-like names are matched by the exact forms in _is_sensitive_key.
+_SENSITIVE_PARTS = (
+    "token", "sig", "sign", "auth", "secret", "session", "password",
+    "passwd", "pwd", "cookie", "credential", "policy", "hmac", "bearer",
+)
+_USERINFO_RE = re.compile(r"://[^/@\s]+@")
+_PARAM_RE = re.compile(r"([?&][^=&#\s]+)=([^&#\s]*)")
+_BARE_ASSIGN_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9_-]{1,40})=([^\s&;]+)")
+_HEADER_SECRET_RE = re.compile(
+    r"\b(authorization|cookie|set-cookie|x-api-key)\s*[:=]\s*(?:Bearer\s+)?[^\s;]+", re.I)
+
+
+def _is_sensitive_key(key):
+    lower = key.lower()
+    if lower == "key" or "apikey" in lower or "api_key" in lower:
+        return True
+    if lower.endswith("_key") or lower.endswith("-key"):
+        return True
+    return any(part in lower for part in _SENSITIVE_PARTS)
+
+
+def _redact_url(url):
+    """Masks userinfo + signed-url tokens; host/path/content ids stay readable."""
+    if not url:
+        return url or ""
+    result = _USERINFO_RE.sub("://***@", str(url))
+
+    def mask(match):
+        key = match.group(1)[1:]
+        return match.group(1) + "=***" if _is_sensitive_key(key) else match.group(0)
+
+    return _PARAM_RE.sub(mask, result)
+
+
+def _redact_text(text):
+    if text is None:
+        return ""
+    result = _HEADER_SECRET_RE.sub(lambda m: m.group(1) + ": ***", str(text))
+    result = _redact_url(result)
+
+    def mask_bare(match):
+        return match.group(1) + "=***" if _is_sensitive_key(match.group(1)) else match.group(0)
+
+    # Secrets also appear mid-sentence in yt-dlp errors ("... token=abc ..."), not only
+    # after a "?" in a url.
+    return _BARE_ASSIGN_RE.sub(mask_bare, result)
+
+
+def _redact_proxy(proxy):
+    value = (proxy or "").strip() if isinstance(proxy, str) else ""
+    return _USERINFO_RE.sub("://***@", value) if value else "(none)"
+
+
+def _diag_ts():
+    now = time.time()
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)) + ".%03d" % int(
+        (now - int(now)) * 1000)
+
+
+def _diag_write(text):
+    path = _DIAG_PATH
+    if not path:
+        return
+    try:
+        with _DIAG_LOCK:
+            with open(path, "a", encoding="utf-8", errors="replace") as fh:
+                fh.write(text if text.endswith("\n") else text + "\n")
+    except Exception:
+        pass  # diagnostics must never break the download it is describing
+
+
+def _dlog(tag, message, level="I"):
+    if not _DIAG_PATH:
+        return
+    line = "%s %s/py-%s [py-%s]: %s" % (
+        _diag_ts(), level, tag, threading.current_thread().name[:20],
+        _redact_text(message).replace("\n", " "))
+    _diag_write(line)
+
+
+def _dlog_tb(tag, context):
+    """Logs the *real* exception (the user only sees _human_error's friendly summary)."""
+    if not _DIAG_PATH:
+        return
+    block = "%s E/py-%s [py]: %s\n%s" % (
+        _diag_ts(), tag, context, _redact_text(traceback.format_exc()).rstrip())
+    _diag_write(block)
+
+
+def _diag_from_options(options):
+    """Adopts the diag path from one call's options (if any). Returns True when active."""
+    global _DIAG_PATH
+    try:
+        path = (options or {}).get("diag_log_path")
+    except AttributeError:
+        path = None
+    if isinstance(path, str) and path:
+        _DIAG_PATH = path
+        return True
+    return bool(_DIAG_PATH)
+
+
+def configure_diag(path):
+    """Called once by Kotlin after the runtime boots (diag build only)."""
+    global _DIAG_PATH
+    _DIAG_PATH = path or ""
+    if _DIAG_PATH:
+        _dlog("boot", "python diag configured engine=%s yt_dlp=%s python=%s path=%s" % (
+            ENGINE_VERSION, getattr(yt_dlp.version, "__version__", "?"),
+            "%d.%d.%d" % sys.version_info[:3], _DIAG_PATH))
+    return json.dumps({"ok": True, "diag": bool(_DIAG_PATH)}, ensure_ascii=False)
+
+
+class _DiagLogger:
+    """yt-dlp logger that mirrors *everything* (debug included) into the diag file."""
+
+    def __init__(self, tag="yt-dlp"):
+        self.tag = tag
+
+    def debug(self, msg):
+        # yt-dlp prefixes webpage-download lines with "[debug] "; keep the text as-is.
+        _dlog(self.tag, msg, "D")
+
+    def info(self, msg):
+        _dlog(self.tag, msg, "I")
+
+    def warning(self, msg):
+        _dlog(self.tag, msg, "W")
+
+    def error(self, msg):
+        _dlog(self.tag, msg, "E")
+
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular
@@ -206,6 +354,18 @@ def _base_opts(options):
         # yt-dlp passes this to both webpage extraction and media/fragment requests.
         # Empty strings must not override the process/network defaults.
         opts["proxy"] = proxy.strip()
+    if _diag_from_options(options):
+        # Verbose yt-dlp: extractor arguments, requested urls, format sorting, retries,
+        # warnings that production mode silences - all land in the diag file.
+        opts.update({
+            "quiet": False,
+            "no_warnings": False,
+            "verbose": True,
+            "logger": _DiagLogger("yt-dlp"),
+        })
+        _dlog("opts", "yt-dlp opts fragments=%s proxy=%s ckFile=%s ua_override=%s" % (
+            fragment_concurrency, _redact_proxy(opts.get("proxy")),
+            bool(opts.get("cookiefile")), bool(opts.get("http_headers"))))
     return opts
 
 
@@ -744,6 +904,7 @@ def _instagram_public_embed(ydl, url):
     shortcode = _instagram_shortcode(url)
     if not shortcode:
         return None
+    _dlog("instagram", "public embed fallback for shortcode=%s" % shortcode)
     embed_url = "https://www.instagram.com/p/%s/embed/captioned/" % shortcode
     request = Request(embed_url, headers={
         "Referer": "https://www.instagram.com/p/%s/" % shortcode,
@@ -753,11 +914,16 @@ def _instagram_public_embed(ydl, url):
     try:
         final_path = urllib.parse.urlsplit(response.url).path
         if final_path.startswith("/accounts/login"):
+            _dlog("instagram", "embed redirected to login -> fallback unavailable", "W")
             return None
         page = response.read().decode("utf-8", "replace")
     finally:
         response.close()
-    return _parse_instagram_public_embed(page, shortcode, url)
+    parsed = _parse_instagram_public_embed(page, shortcode, url)
+    _dlog("instagram", "embed page %d chars parsed=%s formats=%s" % (
+        len(page), parsed is not None,
+        len((parsed or {}).get("formats") or []) if isinstance(parsed, dict) else "?"))
+    return parsed
 
 
 _SHORT_SHARE_HOSTS = ("pin.it",)
@@ -792,8 +958,10 @@ def _follow_redirect(ydl, url):
             resp.close()
         except Exception:
             pass
+        _dlog("extract", "redirect %s -> %s" % (_redact_url(url), _redact_url(final)))
         return final if isinstance(final, str) and final.startswith("http") else None
     except Exception:
+        _dlog_tb("extract", "redirect resolution failed for %s" % _redact_url(url))
         return None
 
 
@@ -824,6 +992,7 @@ def _image_direct_url(info, rows):
 
 def _extract_info(ydl, url, download=False):
     """Uses yt-dlp first, then Instagram's public embed only as a no-login fallback."""
+    _dlog("extract", "extract_info download=%s url=%s" % (download, _redact_url(url)))
     if _needs_redirect_resolution(url):
         final = _follow_redirect(ydl, url)
         if final and final != url:
@@ -839,20 +1008,30 @@ def _extract_info(ydl, url, download=False):
             raise
         if not _instagram_shortcode(url):
             raise
+        _dlog("extract", "official extractor failed (%s: %s); trying instagram embed" % (
+            exc.__class__.__name__, _sanitize(exc, 250)), "W")
         try:
             fallback = _instagram_public_embed(ydl, url)
         except Exception:
+            _dlog_tb("extract", "instagram embed fallback crashed")
             fallback = None
         if fallback is None:
+            _dlog("extract", "instagram embed fallback empty; original error wins", "W")
             raise
+        _dlog("extract", "instagram embed fallback produced a result")
         return ydl.process_ie_result(fallback, download=download)
 
 
 def _extract(url, options, download=False, flat_playlist=False):
+    _diag_from_options(options)
     if not download:
         cached = _cache_get(url)
         if cached is not None:
+            _dlog("extract", "info CACHE HIT url=%s extractor=%s" % (
+                _redact_url(url), cached.get("extractor_key") or cached.get("extractor")))
             return cached
+    _dlog("extract", "extract start download=%s flat=%s url=%s" % (
+        download, flat_playlist, _redact_url(url)))
     opts = _base_opts(options)
     probe_only = not download
     opts.update({
@@ -867,6 +1046,7 @@ def _extract(url, options, download=False, flat_playlist=False):
             "lazy_playlist": True,
             "playlistend": MAX_PLAYLIST_ITEMS,
         })
+    started = time.time()
     with _AriaYoutubeDL(opts) as ydl:
         info = _extract_info(ydl, url, download=False)
         if info is None:
@@ -874,6 +1054,15 @@ def _extract(url, options, download=False, flat_playlist=False):
         info = ydl.sanitize_info(info)
         if not download:
             _cache_put(url, info)
+        _dlog("extract", "extract ok in %.1fs type=%s extractor=%s title=%r entries=%s "
+              "formats=%s requested=%s webpage=%s" % (
+                  time.time() - started, info.get("_type"),
+                  info.get("extractor_key") or info.get("extractor"),
+                  _sanitize(info.get("title") or "", 120),
+                  len(info.get("entries") or []) if info.get("_type") == "playlist" else "-",
+                  len(info.get("formats") or []),
+                  [r.get("format_id") for r in (info.get("requested_formats") or [])],
+                  _redact_url(info.get("webpage_url") or "")))
         return info
 
 
@@ -888,8 +1077,11 @@ def _first_entry(info):
 
 def probe(url, options_json="{}"):
     """Metadata + playlist entries + list of usable formats."""
+    started = time.time()
     try:
         options = json.loads(options_json or "{}")
+        _diag_from_options(options)
+        _dlog("probe", "probe start url=%s" % _redact_url(url))
         info = _extract(url, options, download=False, flat_playlist=True)
 
         if info.get("_type") == "playlist":
@@ -903,6 +1095,8 @@ def probe(url, options_json="{}"):
                     "id": e.get("id"),
                     "uploader": _sanitize(e.get("uploader") or e.get("channel") or ""),
                 })
+            _dlog("probe", "probe playlist ok in %.1fs entries=%d title=%r" % (
+                time.time() - started, len(cleaned), _sanitize(info.get("title") or "", 120)))
             return json.dumps({
                 "ok": True,
                 "is_playlist": True,
@@ -916,6 +1110,17 @@ def probe(url, options_json="{}"):
             }, ensure_ascii=False)
 
         rows = _usable_rows(info)
+        _dlog("probe", "probe ok in %.1fs usableRows=%d rawFormats=%d directImage=%s" % (
+            time.time() - started, len(rows), len(info.get("formats") or []),
+            _redact_url(_image_direct_url(info, rows) or "")))
+        for row in rows:
+            _dlog("probe", " row id=%s ext=%s %sx%s fps=%s size=%s%s audioOnly=%s prog=%s "
+                  "vOnly=%s vcodec=%s acodec=%s tbr=%s drm=%s note=%r" % (
+                      row.get("id"), row.get("ext"), row.get("width"), row.get("height"),
+                      row.get("fps"), row.get("filesize"), "~" if row.get("size_approx") else "",
+                      row.get("audio_only"), row.get("progressive"), row.get("video_only"),
+                      row.get("vcodec"), row.get("acodec"), row.get("tbr"), row.get("has_drm"),
+                      _sanitize(row.get("note") or "", 80)), "D")
         return json.dumps({
             "ok": True,
             "is_playlist": False,
@@ -932,20 +1137,35 @@ def probe(url, options_json="{}"):
             "has_audio_only": any(r["audio_only"] for r in rows),
         }, ensure_ascii=False)
     except Exception as exc:  # noqa: BLE001
+        _dlog("probe", "probe FAILED in %.1fs url=%s human=%r" % (
+            time.time() - started, _redact_url(url), _human_error(exc)), "E")
+        _dlog_tb("probe", "probe traceback")
         return json.dumps({"ok": False, "error": _human_error(exc)}, ensure_ascii=False)
 
 
 def resolve(url, options_json="{}"):
     """Turns (url, preset) into a concrete download plan, validating availability."""
+    started = time.time()
     try:
         options = json.loads(options_json or "{}")
+        _diag_from_options(options)
         preset = options.get("preset") or "best"
+        _dlog("resolve", "resolve start preset=%s selected=%s/%s output=%s/%s abr=%s url=%s" % (
+            preset, options.get("selected_format_id") or "-", options.get("selected_audio_id") or "-",
+            options.get("output_kind") or "-", options.get("output_ext") or "-",
+            options.get("audio_bitrate") or 0, _redact_url(url)))
         info = _first_entry(_extract(url, options, download=False))
         rows = _usable_rows(info)
         if not rows:
+            _dlog("resolve", "resolve FAILED: no usable rows (rawFormats=%d)" % len(
+                info.get("formats") or []), "E")
             return json.dumps({"ok": False, "error": "فرمت قابل دانلودی پیدا نشد."},
                               ensure_ascii=False)
         plan, warning = _choose_plan(rows, preset, options)
+        _dlog("resolve", "chosen plan=%s warning=%r" % (
+            {k: plan.get(k) for k in ("mode", "format_id", "video_id", "audio_id", "ext",
+                                      "source_ext", "height", "filesize", "postprocess",
+                                      "output_kind", "audio_only")} if plan else None, warning))
         if not plan:
             return json.dumps({"ok": False, "error": warning or "فرمت قابل دانلودی پیدا نشد."},
                               ensure_ascii=False)
@@ -959,8 +1179,12 @@ def resolve(url, options_json="{}"):
             "webpage_url": info.get("webpage_url") or url,
             "warning": warning,
         })
+        _dlog("resolve", "resolve ok in %.1fs" % (time.time() - started))
         return json.dumps(plan, ensure_ascii=False)
     except Exception as exc:  # noqa: BLE001
+        _dlog("resolve", "resolve FAILED in %.1fs url=%s human=%r" % (
+            time.time() - started, _redact_url(url), _human_error(exc)), "E")
+        _dlog_tb("resolve", "resolve traceback")
         return json.dumps({"ok": False, "error": _human_error(exc)}, ensure_ascii=False)
 
 
@@ -1047,13 +1271,21 @@ def _parallel_download(fmt, info, out_dir, connections, callback, proxy=None):
         req_headers["Range"] = "bytes=%d-%s" % (start, "" if end is None else end)
         return opener.open(urllib.request.Request(url, headers=req_headers), timeout=30)
 
+    _dlog("parallel", "probe fmt=%s ext=%s size=%s url=%s" % (
+        fmt.get("format_id"), fmt.get("ext"),
+        fmt.get("filesize") or fmt.get("filesize_approx"), _redact_url(url)))
     # Probe: one byte tells us whether ranged parallel downloads are possible.
     try:
         probe_resp = open_range(0, 0)
     except Exception as exc:
+        _dlog("parallel", "probe request failed: %s" % exc, "W")
         raise RuntimeError(str(exc)) from exc
     status = getattr(probe_resp, "status", None) or probe_resp.getcode()
+    _dlog("parallel", "probe HTTP %s range=%r len=%s" % (
+        status, probe_resp.headers.get("Content-Range"),
+        probe_resp.headers.get("Content-Length")))
     if status == 200:
+        _dlog("parallel", "range ignored by server: single-connection streaming")
         # Range ignored: stream this very response as a single-connection download.
         total = int(probe_resp.headers.get("Content-Length") or 0)
         done = 0
@@ -1090,6 +1322,8 @@ def _parallel_download(fmt, info, out_dir, connections, callback, proxy=None):
 
     connections = max(1, min(16, int(connections or 8)))
     seg_count = max(1, min(connections, total // (1024 * 1024)))
+    _dlog("parallel", "segmented download total=%d segments=%d dest=%s" % (
+        total, seg_count, os.path.basename(dest)))
     base, remainder = divmod(total, seg_count)
     ranges = []
     cursor = 0
@@ -1149,12 +1383,16 @@ def _parallel_download(fmt, info, out_dir, connections, callback, proxy=None):
                 return
             except Exception as exc:  # noqa: BLE001
                 tries += 1
+                _dlog("parallel", "segment %d try %d failed: %s (have=%s)" % (
+                    index, tries, exc, progress[index]), "W")
                 if tries > 4:
                     failures.append(str(exc))
                     stop.set()
                     return
                 stop.wait(1.5)
 
+    _dlog("parallel", "resume state: %d bytes already in segment files" % sum(progress))
+    _last_milestone = [-1]
     threads = [threading.Thread(target=worker, args=(i,), daemon=True)
                for i in range(seg_count)]
     for thread in threads:
@@ -1178,16 +1416,24 @@ def _parallel_download(fmt, info, out_dir, connections, callback, proxy=None):
             "eta": int((total - done) / speed) if speed else 0,
             "percent": round(done * 100.0 / total, 1),
             "filename": os.path.basename(dest)})
+        _step = int(done * 100 / total) // 10 if total else 0
+        if _step != _last_milestone[0]:
+            _last_milestone[0] = _step
+            _dlog("parallel", "progress %d%% (%d/%d) speed=%sB/s" % (
+                done * 100 // total if total else 0, done, total, speed), "D")
     for thread in threads:
         thread.join(timeout=5)
     if _cancelled(callback):
         raise _Cancelled()
     if failures:
+        _dlog("parallel", "segment failures: %s" % failures[:3], "W")
         if failures[0] == "unsupported":
             raise _ParallelUnsupported("segmented download unsupported")
         raise RuntimeError(failures[0])
     if sum(progress) < total:
+        _dlog("parallel", "incomplete: %d of %d bytes in segments" % (sum(progress), total), "W")
         raise RuntimeError("connection closed early")
+    _dlog("parallel", "assembling %d segments -> %s" % (seg_count, os.path.basename(dest)))
 
     with open(dest, "wb") as out:
         for path in seg_paths:
@@ -1267,25 +1513,29 @@ class _Logger:
         self.callback = callback
 
     def debug(self, msg):
-        pass
+        _dlog("yt-dlp", msg, "D")
 
     def info(self, msg):
-        pass
+        _dlog("yt-dlp", msg, "I")
 
     def warning(self, msg):
-        pass
+        _dlog("yt-dlp", msg, "W")
 
     def error(self, msg):
+        _dlog("yt-dlp", msg, "E")
         _event(self.callback, {"type": "log", "message": _sanitize(msg, 300)})
 
 
 def _download_once(request, callback):
     """One download attempt; raises on failure so download() can retry transient ones."""
+    _diag_from_options(request)
     url = request.get("url")
     out_dir = request.get("out_dir") or "."
     preset = request.get("preset") or "best"
     format_id = request.get("format_id")
     os.makedirs(out_dir, exist_ok=True)
+    _dlog("download", "attempt start fmt=%s preset=%s out=%s url=%s" % (
+        format_id or "-", preset, out_dir, _redact_url(url or "")))
 
     # Fast path: a progressive file (Pornhub MP4, YouTube MP4/WebM, ...) is fetched
     # with parallel ranged segments straight from the already-extracted info, so no
@@ -1298,6 +1548,8 @@ def _download_once(request, callback):
             fmt = _parallel_candidate(info, format_id)
         except Exception:
             fmt = None
+        _dlog("download", "parallel candidate for fmt %s: %s" % (
+            format_id, "yes ext=" + str(fmt.get("ext")) if fmt is not None else "no"))
         if fmt is not None:
             try:
                 connections = 8
@@ -1324,6 +1576,8 @@ def _download_once(request, callback):
             except Exception:
                 # Parallel fetching is an optimisation, never a single point of
                 # failure: yt-dlp below re-extracts fresh and downloads its own way.
+                # (In production this stayed silent; the diag build records WHY.)
+                _dlog_tb("download", "parallel path failed for fmt %s; falling back to yt-dlp" % format_id)
                 pass
 
     opts = _base_opts(request)
@@ -1343,11 +1597,33 @@ def _download_once(request, callback):
         opts["format"] = "ba[ext=m4a]/ba[ext=mp4]/ba/b"
     else:
         opts["format"] = "b"
+    _dlog("download", "yt-dlp path format selector=%r fragments=%s" % (
+        opts.get("format"), opts.get("concurrent_fragment_downloads")))
+
+    _milestone = {"step": -1, "file": ""}
 
     def hook(d):
         if _cancelled(callback):
             raise _Cancelled()
         status = d.get("status")
+        if _DIAG_PATH and status in ("started", "finished", "error"):
+            _dlog("download", "hook %s file=%s downloaded=%s total=%s" % (
+                status, os.path.basename(str(d.get("filename") or "")),
+                d.get("downloaded_bytes"), d.get("total_bytes") or d.get("total_bytes_estimate")))
+        if _DIAG_PATH and status == "downloading":
+            total_h = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            done_h = d.get("downloaded_bytes") or 0
+            fname_h = str(d.get("filename") or "")
+            if fname_h != _milestone["file"]:
+                _milestone["file"] = fname_h
+                _milestone["step"] = -1
+            step_h = int(done_h * 100 / total_h) // 10 if total_h else -1
+            if step_h >= 0 and step_h != _milestone["step"]:
+                _milestone["step"] = step_h
+                _dlog("download", "progress %d%% (%s/%s) speed=%s frag=%s/%s file=%s" % (
+                    int(done_h * 100 / total_h), done_h, total_h, int(d.get("speed") or 0),
+                    d.get("fragment_index"), d.get("fragment_count"),
+                    os.path.basename(fname_h)), "D")
         if status == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             done = d.get("downloaded_bytes") or 0
@@ -1365,6 +1641,14 @@ def _download_once(request, callback):
 
     opts["progress_hooks"] = [hook]
 
+    def pp_hook(d):
+        _dlog("download", "postprocessor %s status=%s file=%s" % (
+            d.get("postprocessor"), d.get("status"),
+            os.path.basename(str((d.get("info_dict") or {}).get("filepath") or ""))))
+
+    if _DIAG_PATH:
+        opts["postprocessor_hooks"] = [pp_hook]
+
     with _AriaYoutubeDL(opts) as ydl:
         info = _extract_info(ydl, url, download=True)
         if info is None:
@@ -1381,7 +1665,11 @@ def _download_once(request, callback):
         if path and os.path.exists(path):
             files.append(path)
     if not files:
+        _dlog("download", "yt-dlp finished but no output file found in %s (dir=%s)" % (
+            out_dir, os.listdir(out_dir) if os.path.isdir(out_dir) else "?"), "E")
         raise RuntimeError("فایل خروجی پیدا نشد")
+    _dlog("download", "yt-dlp path done files=%s" % (
+        ["%s(%dB)" % (os.path.basename(p), os.path.getsize(p)) for p in files],))
 
     result = {
         "ok": True,
@@ -1412,17 +1700,27 @@ def download(request_json, callback=None):
         {"type":"error","message":...}
         {"type":"cancelled"}
     """
+    started = time.time()
     try:
         request = json.loads(request_json)
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"ok": False, "error": _human_error(exc)}, ensure_ascii=False)
+    _diag_from_options(request)
     url = request.get("url")
+    _dlog("download", "download() fmt=%s preset=%s url=%s" % (
+        request.get("format_id") or "-", request.get("preset") or "best", _redact_url(url or "")))
     last_exc = None
     for attempt in range(3):
         try:
             result = _download_once(request, callback)
+            _dlog("download", "download() ok on attempt %d in %.1fs files=%s" % (
+                attempt + 1, time.time() - started,
+                ["%s(%sB)" % (os.path.basename(f.get("path") or ""), f.get("size"))
+                 for f in result.get("files") or []]))
             return json.dumps(result, ensure_ascii=False)
         except _Cancelled:
+            _dlog("download", "download() cancelled on attempt %d after %.1fs" % (
+                attempt + 1, time.time() - started), "W")
             _event(callback, {"type": "cancelled"})
             return json.dumps({"ok": False, "cancelled": True, "error": "دانلود متوقف شد"},
                               ensure_ascii=False)
@@ -1432,6 +1730,10 @@ def download(request_json, callback=None):
                 return json.dumps({"ok": False, "cancelled": True, "error": "دانلود متوقف شد"},
                                   ensure_ascii=False)
             last_exc = exc
+            _dlog("download", "attempt %d FAILED (%s: %s) transient=%s human=%r" % (
+                attempt + 1, exc.__class__.__name__, _sanitize(exc, 300),
+                _is_transient_error(exc), _human_error(exc)), "E")
+            _dlog_tb("download", "download attempt %d traceback" % (attempt + 1))
             if attempt >= 2 or not _is_transient_error(exc):
                 break
             # Signed URLs / sessions from the failed attempt may be the problem:
@@ -1446,6 +1748,8 @@ def download(request_json, callback=None):
                 return json.dumps({"ok": False, "cancelled": True,
                                    "error": "دانلود متوقف شد"}, ensure_ascii=False)
     message = _human_error(last_exc)
+    _dlog("download", "download() FAILED in %.1fs final=%r detail=%r" % (
+        time.time() - started, message, _sanitize(last_exc, 300)), "E")
     _event(callback, {"type": "error", "message": message})
     return json.dumps({"ok": False, "error": message,
                        "detail": _sanitize(last_exc, 400)}, ensure_ascii=False)
@@ -1456,8 +1760,11 @@ def download(request_json, callback=None):
 
 def search(query, limit=1, options_json="{}"):
     """Resolves a text query to stream urls (used by the Spotify bridge)."""
+    started = time.time()
     try:
         options = json.loads(options_json or "{}")
+        _diag_from_options(options)
+        _dlog("search", "search start limit=%s query=%r" % (limit, query))
         options["noplaylist"] = True
         opts = _base_opts(options)
         opts.update({"skip_download": True, "extract_flat": True})
@@ -1475,12 +1782,21 @@ def search(query, limit=1, options_json="{}"):
                 "duration": e.get("duration"),
                 "uploader": _sanitize(e.get("uploader") or e.get("channel") or ""),
             })
+        _dlog("search", "search ok in %.1fs hits=%d %s" % (
+            time.time() - started, len(entries),
+            ["%r dur=%s by %r" % (e["title"], e.get("duration"), e.get("uploader"))
+             for e in entries]))
         return json.dumps({"ok": True, "entries": entries}, ensure_ascii=False)
     except Exception as exc:  # noqa: BLE001
+        _dlog("search", "search FAILED query=%r human=%r" % (query, _human_error(exc)), "E")
+        _dlog_tb("search", "search traceback")
         return json.dumps({"ok": False, "error": _human_error(exc)}, ensure_ascii=False)
 
 
 def engine_info():
+    _dlog("boot", "engine_info engine=%s yt_dlp=%s python=%s diag=%s" % (
+        ENGINE_VERSION, getattr(yt_dlp.version, "__version__", "unknown"),
+        sys.version.split()[0], bool(_DIAG_PATH)))
     return json.dumps({
         "engine": ENGINE_VERSION,
         "yt_dlp": getattr(yt_dlp.version, "__version__", "unknown"),

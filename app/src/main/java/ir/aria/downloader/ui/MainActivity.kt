@@ -30,6 +30,7 @@ import ir.aria.downloader.data.FileSaver
 import ir.aria.downloader.databinding.ActivityMainBinding
 import ir.aria.downloader.databinding.DialogDetailsBinding
 import ir.aria.downloader.databinding.DialogRenameBinding
+import ir.aria.downloader.diag.DiagLog
 import ir.aria.downloader.model.DownloadItem
 import ir.aria.downloader.model.DownloadStatus
 import ir.aria.downloader.service.DownloadService
@@ -160,6 +161,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupHome() {
         binding.quickDownloadButton.setOnClickListener {
             val text = binding.quickUrlInput.text?.toString()?.trim().orEmpty()
+            DiagLog.i("Main", "quick download clicked, input " + text.length + " chars: '" + text.take(200) + "'")
             if (text.isBlank()) {
                 // Try clipboard first, like the mockup's paste-first flow.
                 val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -193,6 +195,7 @@ class MainActivity : AppCompatActivity() {
         )
         for ((view, hint) in shortcuts) {
             view.setOnClickListener {
+                DiagLog.d("Main", "shortcut tapped: $hint")
                 view.animate().scaleX(0.94f).scaleY(0.94f).setDuration(90).withEndAction {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
                     openAddScreen(platformHint = hint)
@@ -212,6 +215,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setFilter(newFilter: Filter) {
+        DiagLog.d("Main", "filter -> $newFilter")
         filter = newFilter
         val chipId = when (newFilter) {
             Filter.ALL -> R.id.chipAll
@@ -406,6 +410,7 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------------------------------ actions
 
     private fun toggleItem(item: DownloadItem) {
+        DiagLog.i("Main", "toggle #" + item.id + " status=" + item.status + " '" + item.fileName + "'")
         when (item.status) {
             DownloadStatus.RUNNING, DownloadStatus.QUEUED ->
                 DownloadService.send(this, DownloadService.ACTION_PAUSE, item.id)
@@ -416,8 +421,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openItem(item: DownloadItem) {
+        DiagLog.i("Main", "open item #" + item.id + " '" + item.fileName + "' status=" + item.status)
         val intent = FileSaver.openIntent(this, item)
         if (intent == null) {
+            DiagLog.w("Main", "openItem: no intent (file missing?) #" + item.id + " uri=" + item.fileUri)
             Toast.makeText(this, R.string.error_open_file, Toast.LENGTH_SHORT).show()
             return
         }
@@ -431,6 +438,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showDetails(item: DownloadItem) {
+        DiagLog.i(
+            "Main",
+            "details #" + item.id + " status=" + item.status + " engine=" + item.engine +
+                " size=" + item.downloadedBytes + "/" + item.totalBytes +
+                " error='" + item.errorMessage + "' url=" + DiagLog.redactUrl(item.url)
+        )
         val dialogBinding = DialogDetailsBinding.inflate(layoutInflater)
         val dialog = MaterialAlertDialogBuilder(this)
             .setView(dialogBinding.root)
@@ -521,6 +534,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmDelete(ids: List<Long>) {
+        DiagLog.i("Main", "delete requested ids=$ids")
         val checkBox = CheckBox(this).apply {
             text = getString(R.string.delete_file_too)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.aria_text))
@@ -560,6 +574,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openDownloadsList(mode: String) {
+        DiagLog.d("Main", "open downloads list mode=$mode")
         startActivity(
             Intent(this, DownloadsListActivity::class.java)
                 .putExtra(DownloadsListActivity.EXTRA_MODE, mode)
@@ -567,6 +582,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openAddScreen(prefill: String? = null, platformHint: String? = null) {
+        DiagLog.d("Main", "open add screen hint='$platformHint' prefillLen=" + (prefill?.length ?: 0))
         val intent = Intent(this, AddActivity::class.java).apply {
             if (!prefill.isNullOrBlank()) putExtra(AddActivity.EXTRA_PREFILL, prefill)
             if (!platformHint.isNullOrBlank()) putExtra(AddActivity.EXTRA_PLATFORM_HINT, platformHint)

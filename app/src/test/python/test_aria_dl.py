@@ -9,6 +9,7 @@ import io
 import json
 import os
 from pathlib import Path
+import tempfile
 import unittest
 from unittest import mock
 
@@ -559,6 +560,98 @@ class RetryAndCacheTest(unittest.TestCase):
             result = json.loads(aria_dl.download(json.dumps(request), None))
         self.assertFalse(result["ok"])
         self.assertEqual(1, once.call_count)
+
+
+
+class DiagnosticsTest(unittest.TestCase):
+    """The diag build must record the *real* errors while never leaking secrets."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.log = os.path.join(self.tmp.name, "alldown-diag.log")
+        self.previous = aria_dl._DIAG_PATH
+        aria_dl._DIAG_PATH = ""
+
+    def tearDown(self):
+        aria_dl._DIAG_PATH = self.previous
+        self.tmp.cleanup()
+
+    def read_log(self):
+        return Path(self.log).read_text(encoding="utf-8")
+
+    def test_redact_url_masks_tokens_but_keeps_content_ids(self):
+        self.assertEqual(
+            "https://cdn.example.com/v.mp4?token=***&v=abc",
+            aria_dl._redact_url("https://cdn.example.com/v.mp4?token=sekrit&v=abc"))
+        self.assertEqual(
+            "https://www.pornhub.com/view_video.php?viewkey=ph123",
+            aria_dl._redact_url("https://www.pornhub.com/view_video.php?viewkey=ph123"))
+        self.assertEqual(
+            "https://***@example.com/a?X-Amz-Signature=***&x=1",
+            aria_dl._redact_url("https://user:pass@example.com/a?X-Amz-Signature=deadbeef&x=1"))
+
+    def test_redact_text_masks_headers(self):
+        out = aria_dl._redact_text("Authorization: Bearer abc123 Cookie: sessionid=zz")
+        self.assertNotIn("Bearer", out)
+        self.assertNotIn("abc123", out)
+        self.assertNotIn("sessionid=zz", out)
+
+    def test_redact_proxy_keeps_endpoint_hides_password(self):
+        self.assertEqual("http://***@127.0.0.1:8080",
+                         aria_dl._redact_proxy("http://dana:secret@127.0.0.1:8080"))
+        self.assertEqual("(none)", aria_dl._redact_proxy(""))
+
+    def test_base_opts_stay_quiet_without_diag(self):
+        opts = aria_dl._base_opts({})
+        self.assertTrue(opts["quiet"])
+        self.assertTrue(opts["no_warnings"])
+        self.assertNotIn("logger", opts)
+        self.assertNotIn("verbose", opts)
+
+    def test_base_opts_become_verbose_with_diag_path(self):
+        opts = aria_dl._base_opts({"diag": True, "diag_log_path": self.log})
+        self.assertFalse(opts["quiet"])
+        self.assertTrue(opts["verbose"])
+        self.assertIsInstance(opts["logger"], aria_dl._DiagLogger)
+        opts["logger"].warning("requested token=shouldnotleak page")
+        content = self.read_log()
+        self.assertIn("py-yt-dlp", content)
+        self.assertIn("token=***", content)
+        self.assertNotIn("shouldnotleak", content)
+
+    def test_configure_diag_writes_boot_line(self):
+        result = json.loads(aria_dl.configure_diag(self.log))
+        self.assertTrue(result["diag"])
+        self.assertIn("python diag configured", self.read_log())
+
+    def test_failed_probe_logs_real_traceback_not_just_human_error(self):
+        aria_dl._DIAG_PATH = self.log
+        boom = RuntimeError("extractor exploded token=leakme here")
+        with mock.patch.object(aria_dl, "_extract", side_effect=boom):
+            result = json.loads(aria_dl.probe("https://example.com/watch?v=diagtest"))
+        self.assertFalse(result["ok"])  # user still gets the friendly message
+        content = self.read_log()
+        self.assertIn("probe FAILED", content)
+        self.assertIn("extractor exploded", content)   # ...but the log keeps the real one
+        self.assertIn("Traceback", content)
+        self.assertNotIn("leakme", content)
+
+    def test_download_logs_every_attempt(self):
+        aria_dl._DIAG_PATH = self.log
+        request = {"url": "https://example.com/v", "out_dir": "/tmp",
+                   "diag_log_path": self.log}
+        with mock.patch.object(
+                aria_dl, "_download_once",
+                side_effect=[RuntimeError("HTTP Error 403: Forbidden"),
+                             {"ok": True, "files": [{"path": "/tmp/a.mp4", "size": 42}]}]), \
+             mock.patch.object(aria_dl, "_sleep_cancellable", lambda s, cb: None), \
+             mock.patch.object(aria_dl, "_cache_invalidate"):
+            result = json.loads(aria_dl.download(json.dumps(request), None))
+        self.assertTrue(result["ok"])
+        content = self.read_log()
+        self.assertIn("attempt 1 FAILED", content)
+        self.assertIn("download() ok on attempt 2", content)
+        self.assertIn("a.mp4(42B)", content)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 package ir.aria.downloader.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.ArrayAdapter
@@ -11,6 +12,7 @@ import ir.aria.downloader.R
 import ir.aria.downloader.data.DownloadRepository
 import ir.aria.downloader.data.Settings
 import ir.aria.downloader.databinding.ActivitySettingsBinding
+import ir.aria.downloader.diag.DiagLog
 import ir.aria.downloader.net.ProxyUrlValidator
 import ir.aria.downloader.service.DownloadService
 import ir.aria.downloader.service.NotificationSupport
@@ -90,6 +92,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.proxyInput.setText(settings.proxyUrl)
         binding.proxySave.setOnClickListener {
             val raw = binding.proxyInput.text?.toString().orEmpty()
+            DiagLog.i("Settings", "proxy save clicked raw=" + DiagLog.redactProxy(raw))
             try {
                 val normalized = ProxyUrlValidator.normalize(raw)
                 settings.proxyUrl = normalized
@@ -102,11 +105,21 @@ class SettingsActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
             } catch (e: IllegalArgumentException) {
+                DiagLog.w("Settings", "invalid proxy rejected: " + DiagLog.redactProxy(raw), e)
                 Toast.makeText(this, R.string.proxy_invalid, Toast.LENGTH_LONG).show()
             }
         }
 
         binding.versionText.text = getString(R.string.version_format, BuildConfig.VERSION_NAME)
+
+        // Diag build only: entry to the log viewer/exporter. Hidden in debug/release.
+        if (DiagLog.enabled) {
+            binding.diagCard.visibility = View.VISIBLE
+            binding.diagOpenButton.setOnClickListener {
+                DiagLog.i("Settings", "open diagnostics screen")
+                startActivity(Intent(this, DiagnosticsActivity::class.java))
+            }
+        }
     }
 
     override fun onResume() {

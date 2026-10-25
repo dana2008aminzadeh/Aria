@@ -177,4 +177,24 @@
     <string name="price_demo_note">قیمت نمایشی است و بعداً اصلاح می‌شود</string>
     <string name="coming_soon">به‌زودی</string>
     <string name="current_plan">پلن فعلی</string>
+
+    <!-- Diagnostics (diag build only) -->
+    <string name="diag_title">لاگ تشخیصی (نسخهٔ دیباگ)</string>
+    <string name="diag_settings_desc">این نسخه همهٔ وقایع را ثبت می‌کند تا مشکل‌ها پیدا شوند. از هر سرویسی لینک بدهید و دانلود کنید، بعد فایل لاگ را از همین‌جا بفرستید.</string>
+    <string name="diag_open">مشاهده و ارسال لاگ</string>
+    <string name="diag_info">همه‌چیز ثبت می‌شود: لینک‌ها، فرمت‌های هر سایت، خطاهای واقعی موتور و شبکه، سرعت و تلاش‌های مجدد. رمز پروکسی، توکن لینک‌های امضاشده و محتوای کوکی هرگز در لاگ نمی‌آید. بعد از تست همهٔ سرویس‌ها، «اشتراک‌گذاری فایل لاگ کامل» را بزنید و فایل را همین‌جا برگردانید.</string>
+    <string name="diag_stats">size: %1$s • %2$s</string>
+    <string name="diag_share">اشتراک‌گذاری فایل لاگ کامل</string>
+    <string name="diag_save">ذخیره در Download</string>
+    <string name="diag_saved">لاگ ذخیره شد: Download/AllDown/%1$s</string>
+    <string name="diag_copy">کپی بخش اخیر</string>
+    <string name="diag_clear">پاک‌کردن لاگ</string>
+    <string name="diag_clear_confirm">همهٔ لاگ‌های ثبت‌شده و گزارش‌های کرش پاک می‌شوند و لاگ تازه شروع می‌شود. اول، اگر لاگ فعلی لازم است آن را بفرستید.</string>
+    <string name="diag_cleared">لاگ پاک شد؛ از نو شروع می‌شود</string>
+    <string name="diag_refresh">به‌روزرسانی</string>
+    <string name="diag_follow">دنبال‌کردن خودکار</string>
+    <string name="diag_engine_test">تست موتور استخراج</string>
+    <string name="diag_engine_testing">در حال تست موتور…</string>
+    <string name="diag_empty">هنوز لاگی ثبت نشده است.</string>
+    <string name="diag_disabled">لاگ تشخیصی فقط در نسخهٔ دیباگ فعال است.</string>
 </resources>

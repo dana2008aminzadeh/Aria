@@ -9,6 +9,14 @@
 
 سورس پروژه مستقیماً در همین مخزن قرار دارد؛ برای دریافت کد به فایل ZIP نیازی نیست.
 
+## نسخهٔ دیباگ (Diag) — برای پیدا و رفع‌کردن باگ‌ها
+
+بیلد تایپ **`diag`** همان برنامه با ثبت **تمام وقایع** در یک فایل لاگ قابل‌ارسال است:
+کنار نسخهٔ اصلی با نام «AllDown دیباگ» نصب می‌شود، از همهٔ سرویس‌ها لینک می‌گیرد و
+از **تنظیمات ← لاگ تشخیصی** فایل لاگ کامل (شامل Traceback واقعی خطاهای موتور، فهرست
+فرمت‌ها، سرعت‌ها و کرش‌ها) اشتراک‌گذاری یا در `Download/AllDown/` ذخیره می‌شود.
+رمز پروکسی، کوکی و توکن‌های امضاشده هرگز در لاگ نمی‌آیند. راهنمای کامل: [DIAGNOSTICS.md](DIAGNOSTICS.md)
+
 ## امکانات نسخهٔ 5.0.0 — Dark Premium Clay (به سبک دموی Pet Services اسکیل)
 
 - **تم کاملاً دارک و پریمیوم:** بوم ذغالی-بنفش `#121017`، کارت‌های خمیری برجسته با حاشیهٔ هایلایت و سایهٔ نرم، بلوک‌های رنگی اشباع (Vibrant) روی دارک — همان زبان فرمی دموی **Pet Services / Pet Grooming & Spa (Claymorphism + Vibrant & Block-based)** در اسکیل UI/UX Pro Max، بدون محتوای حیوانی.
@@ -134,9 +142,12 @@ export JAVA_HOME=/path/to/jdk17
 export ANDROID_HOME=/path/to/android-sdk
 echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleDebug
+
+# نسخهٔ دیباگ با لاگ کامل وقایع (راهنما: DIAGNOSTICS.md)
+./gradlew assembleDiag
 ```
 
-خروجی Debug در `app/build/outputs/apk/debug/` ساخته می‌شود. فایل‌های APK، کش بیلد و `local.properties` در Git نگهداری نمی‌شوند.
+خروجی Debug در `app/build/outputs/apk/debug/` و خروجی Diag در `app/build/outputs/apk/diag/` ساخته می‌شود. CI هر دو را به‌صورت Artifact (`aria-debug-apk` و `alldown-diag-apk`) منتشر می‌کند. فایل‌های APK، کش بیلد و `local.properties` در Git نگهداری نمی‌شوند.
 
 ### امضای Release (اختیاری)
 

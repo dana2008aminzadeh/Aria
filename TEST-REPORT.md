@@ -4,6 +4,29 @@
 
 این گزارش فقط نتیجهٔ تست‌های واقعاً اجراشده را ثبت می‌کند و موفقیت شبکهٔ زنده یا تبدیل native روی گوشی را از روی تست واحد نتیجه نمی‌گیرد.
 
+## نتیجهٔ CI نسخهٔ دیباگ (Diag) — 5.4.0-diag.1
+
+تاریخ بررسی: **2026-10-25**
+
+- Pull Request: https://github.com/dana2008aminzadeh/Aria/pull/14
+- Run موفق: https://github.com/dana2008aminzadeh/Aria/actions/runs/40223398111
+- وضعیت: **موفق** (۳ دقیقه و ۴ ثانیه)
+
+| مرحله | نتیجه |
+|---|---|
+| موتور Python (`app/src/test/python`) | **۴۴ تست موفق** (۸ تست جدید `DiagnosticsTest`؛ محلی و در CI) |
+| Kotlin/JVM/Robolectric (`testDebugUnitTest`) | **موفق** (از جملهٔ `DiagLogTest` جدید برای ریداکت رمزها) |
+| `lintDebug` | **موفق** |
+| `assembleDebug` | **موفق** |
+| `assembleDiag` | **موفق** |
+| آپلود `alldown-diag-apk` | **موفق؛ Artifact شمارهٔ `12609898842`، ۳۹٬۰۶۴٬۳۱۰ بایت، تا 2026-11-08** |
+
+پوشش جدید: ماسک‌شدن توکن/رمز در URL و متن آزاد بدون پنهان‌شدن شناسه‌هایی مثل `viewkey`،
+یکسان‌ماندن opts یوتیوب‌دی‌ال‌پی (`yt-dlp`) در حالت بدون دیاگ، فعال‌شدن Verbose و لاگر
+تشخیصی فقط با `diag_log_path`، و ثبت Traceback واقعی پشت پیام‌های خطای کاربر.
+**نصب روی گوشی و دانلود زنده هنوز تست نشده است** — همین نسخه برای همان تست ساخته شده و
+لاگ برگشتی مبنای رفع باگ‌های بعدی است (راهنما: `DIAGNOSTICS.md`).
+
 ## نتیجهٔ CI پیاده‌سازی 2.2.2
 
 - Pull Request: https://github.com/dana2008aminzadeh/Aria/pull/4
