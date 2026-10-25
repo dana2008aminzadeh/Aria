@@ -8,8 +8,8 @@
     android:layout_marginBottom="8dp"
     android:layoutDirection="rtl"
     app:cardBackgroundColor="@color/aria_surface"
-    app:cardCornerRadius="18dp"
-    app:cardElevation="0dp"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="5dp"
     app:strokeColor="#FFE9D2"
     app:strokeWidth="1dp">
 
@@ -27,14 +27,13 @@
             android:layout_width="52dp"
             android:layout_height="52dp">
 
-            <TextView
+            <ImageView
                 android:id="@+id/typeIcon"
                 android:layout_width="52dp"
                 android:layout_height="52dp"
-                android:background="@drawable/bg_icon"
-                android:gravity="center"
-                android:text="📄"
-                android:textSize="22sp" />
+                android:background="@drawable/block_direct"
+                android:padding="12dp"
+                android:src="@drawable/ic_file_doc" />
 
             <TextView
                 android:id="@+id/engineBadge"

@@ -1,23 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Aria 3.0 — warm light identity (orange / cream), matching the new UI mockups. -->
-    <color name="aria_primary">#FF7A00</color>
-    <color name="aria_primary_dark">#E85D00</color>
-    <color name="aria_primary_light">#FFB35C</color>
+    <!-- AllDown 4.0 — Claymorphism + Vibrant & Block-based (UI/UX Pro Max). -->
+    <color name="aria_primary">#E85D04</color>
+    <color name="aria_primary_bright">#F97316</color>
+    <color name="aria_primary_dark">#C2410C</color>
+    <color name="aria_accent_blue">#2563EB</color>
     <color name="aria_hero_end">#FF9E2C</color>
-    <color name="aria_bg">#FFF7EE</color>
+    <color name="aria_bg">#FFF6EC</color>
     <color name="aria_surface">#FFFFFF</color>
-    <color name="aria_surface2">#FFF0DF</color>
-    <color name="aria_text">#221A12</color>
-    <color name="aria_text_dim">#8A7A68</color>
+    <color name="aria_surface2">#FFEEDD</color>
+    <color name="aria_clay_border">#FFDDBE</color>
+    <color name="aria_text">#2E1A0A</color>
+    <color name="aria_text_dim">#6E5942</color>
     <color name="aria_green">#1DB954</color>
-    <color name="aria_red">#E53935</color>
-    <color name="aria_orange">#FF7A00</color>
-    <!-- Legacy names kept so every existing screen picks up the new palette. -->
-    <color name="aria_blue">#FF7A00</color>
-    <color name="aria_blue_dark">#E85D00</color>
-    <color name="aria_youtube">#FF0000</color>
-    <color name="aria_spotify">#1DB954</color>
-    <color name="aria_instagram">#E1306C</color>
-    <color name="aria_pornhub">#FF9000</color>
+    <color name="aria_red">#DC2626</color>
+    <color name="aria_orange">#E85D04</color>
+    <color name="aria_blue">#E85D04</color>
+    <color name="aria_blue_dark">#C2410C</color>
+    <color name="clay_peach">#FDBCB4</color>
+    <color name="clay_blue">#ADD8E6</color>
+    <color name="clay_mint">#B9F2D0</color>
+    <color name="clay_lilac">#E6E6FA</color>
+    <color name="clay_lemon">#FFF0B8</color>
+    <color name="block_youtube">#FF0033</color>
+    <color name="block_spotify">#1DB954</color>
+    <color name="block_instagram">#E1306C</color>
+    <color name="block_pornhub">#111111</color>
+    <color name="block_pornhub_text">#FF9000</color>
+    <color name="block_direct">#2563EB</color>
 </resources>

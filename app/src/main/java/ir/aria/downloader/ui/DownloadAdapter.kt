@@ -55,7 +55,8 @@ class DownloadAdapter(
             bindProgress(item)
             bindAction(item)
 
-            binding.typeIcon.text = iconFor(item)
+            binding.typeIcon.setImageResource(iconFor(item))
+            binding.typeIcon.setBackgroundResource(tileFor(item))
             binding.engineBadge.visibility = if (item.isMedia) View.VISIBLE else View.GONE
             binding.checkBox.visibility = if (selectionMode()) View.VISIBLE else View.GONE
             binding.checkBox.isChecked = isSelected(item.id)
@@ -166,16 +167,20 @@ class DownloadAdapter(
                 }
         }
 
-        private fun iconFor(item: DownloadItem): String =
+        private fun iconFor(item: DownloadItem): Int =
             when (MimeTypes.categoryOf(item.mimeType, item.fileName)) {
-                MimeTypes.Category.VIDEO -> "🎬"
-                MimeTypes.Category.AUDIO -> "🎵"
-                MimeTypes.Category.IMAGE -> "🖼️"
-                MimeTypes.Category.PDF -> "📕"
-                MimeTypes.Category.ARCHIVE -> "📦"
-                MimeTypes.Category.APP -> "📱"
-                MimeTypes.Category.TEXT -> "📝"
-                MimeTypes.Category.OTHER -> "📄"
+                MimeTypes.Category.VIDEO -> R.drawable.ic_file_video
+                MimeTypes.Category.AUDIO -> R.drawable.ic_file_audio
+                MimeTypes.Category.IMAGE -> R.drawable.ic_file_image
+                else -> R.drawable.ic_file_doc
+            }
+
+        private fun tileFor(item: DownloadItem): Int =
+            when (MimeTypes.categoryOf(item.mimeType, item.fileName)) {
+                MimeTypes.Category.VIDEO -> R.drawable.block_youtube
+                MimeTypes.Category.AUDIO -> R.drawable.block_spotify
+                MimeTypes.Category.IMAGE -> R.drawable.block_instagram
+                else -> R.drawable.block_direct
             }
     }
 

@@ -24,5 +24,5 @@
         android:layout_marginTop="2dp"
         android:maxLines="3"
         android:textColor="@color/aria_text_dim"
-        android:textSize="10sp" />
+        android:textSize="11sp" />
 </LinearLayout>
