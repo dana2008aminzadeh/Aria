@@ -7,6 +7,7 @@ Run with:
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import unittest
 from unittest import mock
@@ -407,6 +408,157 @@ class ExtractionFlowTest(unittest.TestCase):
             "https://www.reddit.com/r/pics/s/AbCdEf"))
         self.assertFalse(aria_dl._needs_redirect_resolution(
             "https://www.reddit.com/r/pics/comments/abc123/title/"))
+
+
+class _RangeHandler:
+    pass
+
+
+class ParallelDownloadTest(unittest.TestCase):
+    """Runs the parallel downloader against a local range-capable HTTP server."""
+
+    DATA = bytes((i * 37 + 11) % 256 for i in range(3 * 1024 * 1024 + 12345))
+
+    @classmethod
+    def setUpClass(cls):
+        import http.server
+        import threading as _threading
+
+        data = cls.DATA
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                range_header = self.headers.get("Range")
+                if range_header:
+                    spec = range_header.split("=", 1)[1]
+                    start_s, _, end_s = spec.partition("-")
+                    start = int(start_s)
+                    end = int(end_s) if end_s else len(data) - 1
+                    end = min(end, len(data) - 1)
+                    body = data[start:end + 1]
+                    self.send_response(206)
+                    self.send_header("Content-Range",
+                                     "bytes %d-%d/%d" % (start, end, len(data)))
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                else:
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+
+        cls.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        cls.port = cls.server.server_address[1]
+        cls.thread = _threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+
+    def _fmt(self):
+        return {"format_id": "720p", "ext": "mp4", "protocol": "https",
+                "url": "http://127.0.0.1:%d/file.mp4" % self.port}
+
+    def test_parallel_download_assembles_exact_bytes(self):
+        import tempfile
+        events = []
+        callback = mock.Mock()
+        callback.should_cancel.return_value = False
+        callback.on_event.side_effect = lambda payload: events.append(json.loads(payload))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = aria_dl._parallel_download(
+                self._fmt(), {"title": "T", "id": "x1"}, tmp, 4, callback)
+            with open(path, "rb") as fh:
+                self.assertEqual(self.DATA, fh.read())
+            self.assertFalse([n for n in os.listdir(tmp) if ".seg" in n])
+        self.assertTrue(any(e["type"] == "progress" and e["downloaded"] == len(self.DATA)
+                            for e in events))
+
+    def test_parallel_download_resumes_partial_segments(self):
+        import tempfile
+        callback = mock.Mock()
+        callback.should_cancel.return_value = False
+        total = len(self.DATA)
+        seg_count = max(1, min(4, total // (1024 * 1024)))
+        base, remainder = divmod(total, seg_count)
+        ranges = []
+        cursor = 0
+        for i in range(seg_count):
+            size = base + (1 if i < remainder else 0)
+            ranges.append((cursor, cursor + size - 1))
+            cursor += size
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = os.path.join(tmp, aria_dl._output_name({"title": "T", "id": "x1"},
+                                                          self._fmt()))
+            # first segment complete, second segment half present
+            s0, e0 = ranges[0]
+            with open(dest + ".seg00", "wb") as fh:
+                fh.write(self.DATA[s0:e0 + 1])
+            s1, e1 = ranges[1]
+            half = (e1 - s1 + 1) // 2
+            with open(dest + ".seg01", "wb") as fh:
+                fh.write(self.DATA[s1:s1 + half])
+            path = aria_dl._parallel_download(
+                self._fmt(), {"title": "T", "id": "x1"}, tmp, 4, callback)
+            with open(path, "rb") as fh:
+                self.assertEqual(self.DATA, fh.read())
+
+    def test_candidate_selection(self):
+        info = {"formats": [
+            {"format_id": "hls-720", "ext": "mp4", "protocol": "m3u8_native",
+             "url": "https://cdn.example.com/x.m3u8"},
+            {"format_id": "720p", "ext": "mp4", "protocol": "https",
+             "url": "https://cdn.example.com/x.mp4"},
+        ]}
+        self.assertIsNone(aria_dl._parallel_candidate(info, "hls-720"))
+        self.assertEqual("720p", aria_dl._parallel_candidate(info, "720p")["format_id"])
+        self.assertIsNone(aria_dl._parallel_candidate(info, "missing"))
+        self.assertIsNone(aria_dl._parallel_candidate(info, None))
+
+
+class RetryAndCacheTest(unittest.TestCase):
+    def test_cache_roundtrip_and_playlist_exclusion(self):
+        aria_dl._INFO_CACHE.clear()
+        aria_dl._cache_put("https://x/v", {"_type": "video", "id": "1"})
+        self.assertEqual("1", aria_dl._cache_get("https://x/v")["id"])
+        aria_dl._cache_put("https://x/p", {"_type": "playlist", "id": "2"})
+        self.assertIsNone(aria_dl._cache_get("https://x/p"))
+        aria_dl._cache_invalidate("https://x/v")
+        self.assertIsNone(aria_dl._cache_get("https://x/v"))
+
+    def test_transient_classification(self):
+        self.assertTrue(aria_dl._is_transient_error(RuntimeError("HTTP Error 403")))
+        self.assertTrue(aria_dl._is_transient_error(RuntimeError("urlopen error timed out")))
+        self.assertFalse(aria_dl._is_transient_error(RuntimeError("This video is DRM protected")))
+        self.assertFalse(aria_dl._is_transient_error(RuntimeError("Private video")))
+
+    def test_download_retries_transient_then_succeeds(self):
+        request = {"url": "https://example.com/v", "out_dir": "/tmp"}
+        with mock.patch.object(
+                aria_dl, "_download_once",
+                side_effect=[RuntimeError("HTTP Error 403: Forbidden"),
+                             {"ok": True, "files": []}]) as once, \
+             mock.patch.object(aria_dl, "_sleep_cancellable", lambda s, cb: None), \
+             mock.patch.object(aria_dl, "_cache_invalidate") as invalidate:
+            result = json.loads(aria_dl.download(json.dumps(request), None))
+        self.assertTrue(result["ok"])
+        self.assertEqual(2, once.call_count)
+        invalidate.assert_called_with("https://example.com/v")
+
+    def test_download_does_not_retry_non_transient(self):
+        request = {"url": "https://example.com/v", "out_dir": "/tmp"}
+        with mock.patch.object(
+                aria_dl, "_download_once",
+                side_effect=RuntimeError("This content is DRM protected")) as once, \
+             mock.patch.object(aria_dl, "_sleep_cancellable", lambda s, cb: None):
+            result = json.loads(aria_dl.download(json.dumps(request), None))
+        self.assertFalse(result["ok"])
+        self.assertEqual(1, once.call_count)
 
 
 if __name__ == "__main__":

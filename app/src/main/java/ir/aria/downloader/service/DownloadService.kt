@@ -357,7 +357,11 @@ class DownloadService : Service() {
         val plan = engine.resolve(startItem.url, startItem.preset, selection)
         if (!plan.ok) {
             Log.e("AriaService", "resolve failed: " + plan.error)
-            failItem(id, plan.error ?: getString(R.string.download_failed))
+            val message = plan.error ?: getString(R.string.download_failed)
+            // Extraction is the flakiest phase on anti-bot sites (Pornhub!): a failed
+            // resolve gets the same automatic retry as a failed download instead of
+            // dying instantly and forcing the user to tap retry by hand.
+            if (!scheduleRetry(id, startItem, message)) failItem(id, message)
             return
         }
         Log.d("AriaService", "plan mode=" + plan.mode + " v=" + plan.videoId + " a=" + plan.audioId + " f=" + plan.formatId)
@@ -535,21 +539,29 @@ class DownloadService : Service() {
         }
         val item = repo.item(id) ?: return
         val message = outcome.error ?: getString(R.string.download_failed)
-        if (settings.autoRetry && item.attempts < 2) {
-            repo.update(id, persist = true) {
-                it.copy(status = DownloadStatus.FAILED, speedBps = 0, errorMessage = message, attempts = it.attempts + 1)
-            }
-            scope.launch {
-                delay(4_000L * (item.attempts + 1))
-                val current = repo.item(id) ?: return@launch
-                if (current.status == DownloadStatus.FAILED && !current.pausedByUser) {
-                    repo.update(id, persist = true) { it.copy(status = DownloadStatus.QUEUED) }
-                    requestSchedule()
-                }
-            }
-            return
-        }
+        if (scheduleRetry(id, item, message)) return
         failItem(id, message)
+    }
+
+    /**
+     * Re-queues a media item after a short backoff when auto-retry is on.
+     * Used both for download failures and for plan/resolve failures, which used
+     * to fail instantly with no retry at all. Returns true when a retry was scheduled.
+     */
+    private fun scheduleRetry(id: Long, item: DownloadItem, message: String): Boolean {
+        if (!settings.autoRetry || item.attempts >= 2) return false
+        repo.update(id, persist = true) {
+            it.copy(status = DownloadStatus.FAILED, speedBps = 0, errorMessage = message, attempts = it.attempts + 1)
+        }
+        scope.launch {
+            delay(4_000L * (item.attempts + 1))
+            val current = repo.item(id) ?: return@launch
+            if (current.status == DownloadStatus.FAILED && !current.pausedByUser) {
+                repo.update(id, persist = true) { it.copy(status = DownloadStatus.QUEUED) }
+                requestSchedule()
+            }
+        }
+        return true
     }
 
     private fun failItem(id: Long, message: String) {
