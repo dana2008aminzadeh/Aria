@@ -13,7 +13,7 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/aria_primary"
+        android:background="@color/aria_surface"
         app:navigationIcon="@drawable/ic_close"
         app:title="@string/add_downloads"
         app:titleTextColor="#FFFFFF" />
@@ -113,7 +113,7 @@
                 android:background="@drawable/clay_block_blue"
                 android:padding="14dp"
                 android:text="@string/per_item_quality_hint"
-                android:textColor="@color/aria_primary_dark"
+                android:textColor="@color/aria_on_pastel"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
@@ -124,7 +124,7 @@
                 android:background="@drawable/clay_block_mint"
                 android:padding="14dp"
                 android:text="@string/media_hint"
-                android:textColor="@color/aria_text_dim"
+                android:textColor="@color/aria_on_pastel"
                 android:textSize="12sp" />
 
             <TextView
@@ -134,7 +134,7 @@
                 android:background="@drawable/clay_block_lilac"
                 android:padding="14dp"
                 android:text="@string/batch_pattern_hint"
-                android:textColor="@color/aria_text_dim"
+                android:textColor="@color/aria_on_pastel"
                 android:textDirection="ltr"
                 android:textSize="12sp" />
 
