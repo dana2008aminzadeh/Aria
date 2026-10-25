@@ -30,6 +30,7 @@ import ir.aria.downloader.net.MediaProcessor
 import ir.aria.downloader.net.MimeTypes
 import ir.aria.downloader.net.Mp4Remuxer
 import ir.aria.downloader.ui.MainActivity
+import ir.aria.downloader.util.AppLog
 import ir.aria.downloader.util.Formats
 import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -115,6 +116,13 @@ class DownloadService : Service() {
         super.onCreate()
         repo = DownloadRepository.get(this)
         settings = repo.settings
+        AppLog.log(
+            "سرویس",
+            "سرویس دانلود ساخته شد | همزمانی=${settings.concurrency} " +
+                "اتصال‌موازی=${settings.fragmentConcurrency} تلاش‌خودکار=${settings.autoRetry} " +
+                "فقط‌وای‌فای=${settings.wifiOnly} پروکسی=${settings.proxyUrl.isNotBlank()} " +
+                "کیفیت‌پیش‌فرض=${settings.defaultPreset}"
+        )
         NotificationSupport.createChannels(this)
         updateNetworkFlags()
         startForegroundCompat(buildProgressNotification())
@@ -209,6 +217,11 @@ class DownloadService : Service() {
         // never resurrect an entry that is no longer queued.
         if (item.status != DownloadStatus.QUEUED) return
         Log.d("AriaService", "start item " + id + " (" + item.engine + ", preset=" + item.preset + ")")
+        AppLog.log(
+            "صف",
+            "شروع آیتم $id | موتور=${item.engine} preset=${item.preset} " +
+                "تلاش=${item.attempts} انتخاب=${item.selectionLabel ?: "-"} | ${item.url}"
+        )
         repo.update(id, persist = true) {
             it.copy(status = DownloadStatus.RUNNING, speedBps = 0, errorMessage = null)
         }
@@ -267,9 +280,12 @@ class DownloadService : Service() {
         }
 
         try {
+            AppLog.log("HTTP", "شروع آیتم $id | ${item.url}")
             downloader.download(item.url, part, item.etag ?: item.lastModified, listener)
+            AppLog.log("HTTP", "پایان دانلود آیتم $id | حجم فایل موقت=${part.length()}B")
             finishHttpSuccess(id, part)
         } catch (e: HtmlPageException) {
+            AppLog.log("HTTP", "آیتم $id صفحهٔ وب بود؛ به موتور رسانه‌ای واگذار شد")
             part.delete()
             repo.update(id, persist = true) {
                 it.copy(
@@ -334,6 +350,7 @@ class DownloadService : Service() {
                 pausedByUser = false
             )
         }
+        AppLog.log("HTTP", "آیتم $id کامل شد | ${saved.displayName} | ${size}B | uri=${saved.uri}")
         notifyCompleted(id)
         updateProgressNotification(force = true)
     }
@@ -507,9 +524,11 @@ class DownloadService : Service() {
         val saved = try {
             FileSaver.save(this, source, fileName, mime, emptySet())
         } catch (e: Exception) {
+            AppLog.log("صف", "ذخیرهٔ آیتم $id ناموفق بود", e)
             failItem(id, "ذخیره فایل ناموفق بود")
             return
         }
+        AppLog.log("صف", "آیتم $id کامل شد | ${saved.displayName} | ${size}B | $mime | uri=${saved.uri}")
         repo.update(id, persist = true) {
             it.copy(
                 status = DownloadStatus.COMPLETED,
@@ -549,7 +568,11 @@ class DownloadService : Service() {
      * to fail instantly with no retry at all. Returns true when a retry was scheduled.
      */
     private fun scheduleRetry(id: Long, item: DownloadItem, message: String): Boolean {
-        if (!settings.autoRetry || item.attempts >= 2) return false
+        if (!settings.autoRetry || item.attempts >= 2) {
+            AppLog.log("صف", "آیتم $id دیگر خودکار تلاش نمی‌شود (autoRetry=${settings.autoRetry} تلاش‌ها=${item.attempts}): $message")
+            return false
+        }
+        AppLog.log("صف", "آیتم $id تلاش مجدد خودکار ${item.attempts + 1} از 2، ${4 * (item.attempts + 1)} ثانیه دیگر: $message")
         repo.update(id, persist = true) {
             it.copy(status = DownloadStatus.FAILED, speedBps = 0, errorMessage = message, attempts = it.attempts + 1)
         }
@@ -565,6 +588,8 @@ class DownloadService : Service() {
     }
 
     private fun failItem(id: Long, message: String) {
+        val item = repo.item(id)
+        AppLog.log("صف", "آیتم $id ناموفق شد | ${item?.url ?: ""} | $message")
         repo.update(id, persist = true) {
             it.copy(status = DownloadStatus.FAILED, speedBps = 0, errorMessage = message)
         }
@@ -588,6 +613,7 @@ class DownloadService : Service() {
             is HttpDownloader.HttpException -> httpMessage(error.code)
             else -> "خطای شبکه: " + (error.message ?: "اتصال قطع شد")
         }
+        AppLog.log("HTTP", "خطای آیتم $id (دانلودشده=${downloaded}B): $message", error)
         val transient = error !is HttpDownloader.HttpException
         // A link that returns "connection closed early" is resumable, keep the progress.
         if (transient && settings.autoRetry && item.attempts < 3) {

@@ -5,6 +5,7 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import ir.aria.downloader.data.Settings
+import ir.aria.downloader.util.AppLog
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -208,21 +209,24 @@ class ExtractorEngine private constructor(
             val raw = module().callAttr("engine_info").toString()
             val json = JSONObject(raw)
             EngineInfo(
-                engine = json.optString("engine", "5.4.0"),
+                engine = json.optString("engine", "5.5.0"),
                 ytDlp = json.optString("yt_dlp", "?"),
                 python = json.optString("python", "?")
             )
         } catch (e: Throwable) {
-            EngineInfo("5.4.0", "unavailable", e.javaClass.simpleName)
+            EngineInfo("5.5.0", "unavailable", e.javaClass.simpleName)
         }
     }
 
     override suspend fun probe(url: String): Probe = withContext(Dispatchers.IO) {
+        val startedAt = System.currentTimeMillis()
         try {
             val raw = module().callAttr("probe", url, optionsJson()).toString()
             val json = JSONObject(raw)
             if (!json.optBoolean("ok")) {
-                return@withContext Probe(false, json.optString("error", "استخراج ناموفق بود"))
+                val error = json.optString("error", "استخراج ناموفق بود")
+                AppLog.log("بررسی", "$url | ناموفق (${System.currentTimeMillis() - startedAt}ms): $error")
+                return@withContext Probe(false, error)
             }
             val entries = ArrayList<PlaylistEntry>()
             json.optJSONArray("entries")?.let { array ->
@@ -285,8 +289,17 @@ class ExtractorEngine private constructor(
                 hasAudioOnly = json.optBoolean("has_audio_only"),
                 directFileUrl = json.optString("direct_file_url")
                     .takeIf { it.isNotBlank() && it != "null" }
-            )
+            ).also {
+                AppLog.log(
+                    "بررسی",
+                    "$url | موفق (${System.currentTimeMillis() - startedAt}ms) " +
+                        "extractor=${it.extractor} عنوان=${it.title} " +
+                        "فرمت‌ها=${it.formats.size} پلی‌لیست=${it.isPlaylist} " +
+                        "آیتم‌ها=${it.entries.size} عکس‌مستقیم=${it.directFileUrl ?: "-"}"
+                )
+            }
         } catch (e: Throwable) {
+            AppLog.log("بررسی", "$url | استثنا: ${friendly(e)}", e)
             Probe(false, friendly(e))
         }
     }
@@ -308,11 +321,26 @@ class ExtractorEngine private constructor(
                 options.put("audio_bitrate", chosen.audioBitrateKbps)
                 options.put("selection_label", chosen.label)
             }
+            val resolveStarted = System.currentTimeMillis()
             val raw = module().callAttr("resolve", url, options.toString()).toString()
             val json = JSONObject(raw)
             if (!json.optBoolean("ok")) {
-                return@withContext Plan(false, error = json.optString("error", "فرمت قابل دانلودی پیدا نشد"))
+                val error = json.optString("error", "فرمت قابل دانلودی پیدا نشد")
+                AppLog.log(
+                    "پلن",
+                    "$url | preset=$preset انتخاب=${selection?.label ?: "-"} | ناموفق " +
+                        "(${System.currentTimeMillis() - resolveStarted}ms): $error"
+                )
+                return@withContext Plan(false, error = error)
             }
+            AppLog.log(
+                "پلن",
+                "$url | preset=$preset انتخاب=${selection?.label ?: "-"} | موفق " +
+                    "(${System.currentTimeMillis() - resolveStarted}ms) mode=${json.optString("mode")} " +
+                    "format=${json.optString("format_id")} video=${json.optString("video_id")} " +
+                    "audio=${json.optString("audio_id")} ext=${json.optString("ext")} " +
+                    "size=${json.optLong("filesize", -1)}"
+            )
             Plan(
                 ok = true,
                 mode = json.optString("mode", "single"),
@@ -337,6 +365,7 @@ class ExtractorEngine private constructor(
                 note = json.optString("note")
             )
         } catch (e: Throwable) {
+            AppLog.log("پلن", "$url | استثنا: ${friendly(e)}", e)
             Plan(false, error = friendly(e))
         }
     }
@@ -383,6 +412,8 @@ class ExtractorEngine private constructor(
         shouldCancel: () -> Boolean,
         onProgress: (Progress) -> Unit
     ): Outcome = withContext(Dispatchers.IO) {
+        val downloadStarted = System.currentTimeMillis()
+        AppLog.log("دانلود", "شروع | $url | format=${formatId ?: "-"} preset=$preset")
         try {
             outDir.mkdirs()
             val request = JSONObject()
@@ -413,6 +444,7 @@ class ExtractorEngine private constructor(
                                     )
                                 )
                             }
+                            "log" -> AppLog.log("موتور", event.optString("message"))
                             "done" -> {
                                 val f = event.optJSONArray("files")
                                 if (f != null) {
@@ -440,10 +472,18 @@ class ExtractorEngine private constructor(
             val json = JSONObject(raw)
             val cancelled = json.optBoolean("cancelled")
             if (!json.optBoolean("ok")) {
+                val error = json.optString("error", "دانلود ناموفق بود")
+                val detail = json.optString("detail")
+                AppLog.log(
+                    "دانلود",
+                    "ناموفق | $url | format=${formatId ?: "-"} " +
+                        "(${System.currentTimeMillis() - downloadStarted}ms) " +
+                        "لغوشده=$cancelled خطا=$error جزئیات=$detail"
+                )
                 return@withContext Outcome(
                     ok = false,
                     cancelled = cancelled,
-                    error = json.optString("error", "دانلود ناموفق بود")
+                    error = error
                 )
             }
             val files = ArrayList<MediaFile>()
@@ -455,6 +495,12 @@ class ExtractorEngine private constructor(
                     files.add(MediaFile(path, f.optLong("size", 0L)))
                 }
             }
+            AppLog.log(
+                "دانلود",
+                "موفق | $url | format=${formatId ?: "-"} " +
+                    "(${System.currentTimeMillis() - downloadStarted}ms) " +
+                    "فایل‌ها=" + files.joinToString { "${it.path} (${it.size}B)" }
+            )
             Outcome(
                 ok = files.isNotEmpty(),
                 error = if (files.isEmpty()) "فایل خروجی پیدا نشد" else null,
@@ -463,6 +509,7 @@ class ExtractorEngine private constructor(
                 extractor = json.optString("extractor")
             )
         } catch (e: Throwable) {
+            AppLog.log("دانلود", "استثنا | $url | ${friendly(e)}", e)
             Outcome(false, error = friendly(e))
         }
     }

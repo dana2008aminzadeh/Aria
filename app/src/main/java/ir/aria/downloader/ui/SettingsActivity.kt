@@ -106,6 +106,10 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        binding.logsButton.setOnClickListener {
+            startActivity(android.content.Intent(this, LogsActivity::class.java))
+        }
+
         binding.versionText.text = getString(R.string.version_format, BuildConfig.VERSION_NAME)
     }
 

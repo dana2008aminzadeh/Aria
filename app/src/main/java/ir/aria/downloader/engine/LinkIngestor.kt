@@ -9,7 +9,8 @@ import java.util.Locale
 /** Turns arbitrary links into direct, media, playlist and Spotify queue requests. */
 class LinkIngestor(
     private val engine: ExtractorApi,
-    private val spotifyLookup: (String) -> SpotifyResolver.Collection = SpotifyResolver()::resolve
+    private val spotifyLookup: (String) -> SpotifyResolver.Collection = SpotifyResolver()::resolve,
+    private val log: (String) -> Unit = {}
 ) {
 
     companion object {
@@ -44,8 +45,11 @@ class LinkIngestor(
         val warnings = ArrayList<String>()
         var skipped = 0
 
+        log("شروع افزودن: ${links.size} لینک، preset=$preset، انتخاب‌گر=${chooser != null}")
         for (rawLink in links) {
             val link = MediaUrlNormalizer.normalize(rawLink)
+            if (link != rawLink) log("لینک اصلاح شد: $rawLink -> $link")
+            log("طبقه‌بندی ${UrlClassifier.classify(link)}: $link")
             if (requests.size >= MAX_ITEMS) {
                 skipped += links.size - requests.size
                 warnings.add("به سقف $MAX_ITEMS مورد در هر بار رسیدید؛ بقیه لینک‌ها اضافه نشدند.")
@@ -200,6 +204,7 @@ class LinkIngestor(
                             var request: NewDownload? = null
                             if (chooser != null && probe.formats.isNotEmpty()) {
                                 val selection = chooser(ChoiceRequest(probe, false, probe.title))
+                                log("انتخاب کاربر برای «${probe.title}»: ${selection?.label ?: "لغو شد"}")
                                 if (selection == null) {
                                     skipped++
                                     warnings.add("«${probe.title.ifBlank { link }}» توسط کاربر اضافه نشد.")
@@ -218,6 +223,9 @@ class LinkIngestor(
                 warnings.add("بررسی این لینک ممکن نشد: " + link + " (" + t.javaClass.simpleName + ")")
             }
         }
+        log("پایان افزودن: ${requests.size} مورد در صف، $skipped رد شد")
+        requests.forEach { log("  صف: [${it.engine}] ${it.fileName} | ${it.url} | preset=${it.preset}") }
+        warnings.forEach { log("  هشدار: $it") }
         return Report(requests, warnings, skipped)
     }
 

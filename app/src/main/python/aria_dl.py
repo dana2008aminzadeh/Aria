@@ -1,5 +1,5 @@
 """
-AllDown 5.4.0 - extraction engine.
+AllDown 5.5.0 - extraction engine.
 
 This file is shipped inside the APK and executed by Chaquopy (CPython 3.13 on Android).
 It is also run by the plain CPython interpreter in the test suite, so the code that is
@@ -39,7 +39,7 @@ import yt_dlp  # noqa: E402  (must come after the SSL env vars)
 from yt_dlp.networking import Request  # noqa: E402
 from yt_dlp.networking._urllib import UrllibRH  # noqa: E402
 
-ENGINE_VERSION = "5.4.0"
+ENGINE_VERSION = "5.5.0"
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular
@@ -1055,6 +1055,8 @@ def _parallel_download(fmt, info, out_dir, connections, callback, proxy=None):
     status = getattr(probe_resp, "status", None) or probe_resp.getcode()
     if status == 200:
         # Range ignored: stream this very response as a single-connection download.
+        _event(callback, {"type": "log", "message":
+                          "سرور Range را قبول نکرد؛ دانلود تک‌اتصاله انجام می‌شود"})
         total = int(probe_resp.headers.get("Content-Length") or 0)
         done = 0
         started = time.time()
@@ -1305,6 +1307,9 @@ def _download_once(request, callback):
                     connections = int(request.get("fragment_concurrency") or 8)
                 except (TypeError, ValueError):
                     pass
+                _event(callback, {"type": "log", "message":
+                                  "دانلود موازی: format=%s ext=%s اتصال=%s" % (
+                                      format_id, fmt.get("ext"), connections)})
                 path = _parallel_download(
                     fmt, info, out_dir, connections, callback, request.get("proxy"))
                 result = {
@@ -1364,6 +1369,8 @@ def _download_once(request, callback):
             })
 
     opts["progress_hooks"] = [hook]
+    _event(callback, {"type": "log", "message":
+                      "دانلود با yt-dlp: format=%s preset=%s" % (format_id, preset)})
 
     with _AriaYoutubeDL(opts) as ydl:
         info = _extract_info(ydl, url, download=True)

@@ -130,6 +130,9 @@ class MainActivity : AppCompatActivity() {
         dialog.findViewById<View>(R.id.menuSettings).setOnClickListener {
             close { startActivity(Intent(this, SettingsActivity::class.java)) }
         }
+        dialog.findViewById<View>(R.id.menuLogs).setOnClickListener {
+            close { startActivity(Intent(this, LogsActivity::class.java)) }
+        }
         dialog.findViewById<View>(R.id.menuPauseAll).setOnClickListener {
             close {
                 DownloadService.send(this, DownloadService.ACTION_PAUSE_ALL)

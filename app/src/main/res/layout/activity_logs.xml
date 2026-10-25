@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/aria_bg"
+    android:layoutDirection="rtl"
+    android:orientation="vertical"
+    tools:context=".ui.LogsActivity">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/aria_surface"
+        app:navigationIcon="@drawable/ic_close"
+        app:title="لاگ‌ها و عیب‌یابی"
+        app:titleTextColor="#FFFFFF" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="14dp"
+        android:paddingTop="10dp"
+        android:text="این نسخه برای رفع باگ ساخته شده و همهٔ اتفاق‌ها (لینک، استخراج، دانلود، خطا، سرعت) اینجا ثبت می‌شود. بعد از تست، «ارسال لاگ» را بزنید و فایل را بفرستید."
+        android:textColor="@color/aria_text_dim"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/shareLogsButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:text="ارسال لاگ" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/copyLogsButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:text="کپی" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/clearLogsButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="پاک‌کردن" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/logsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="10dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_input"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/logsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textColor="@color/aria_text"
+            android:textDirection="ltr"
+            android:textSize="11sp"
+            tools:text="10-25 12:00:00.000 [شروع] === AllDown ... ===" />
+    </ScrollView>
+</LinearLayout>

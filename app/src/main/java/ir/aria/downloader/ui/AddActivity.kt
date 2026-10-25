@@ -27,6 +27,7 @@ import ir.aria.downloader.engine.LinkIngestor
 import ir.aria.downloader.net.UrlExtractor
 import ir.aria.downloader.service.DownloadService
 import android.util.Log
+import ir.aria.downloader.util.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -188,7 +189,10 @@ class AddActivity : AppCompatActivity() {
                     if (links.isEmpty()) return@withContext null
                     Log.d("AriaAdd", "parsed " + links.size + " link(s)")
                     val engine = ExtractorEngine.get(this@AddActivity)
-                    val ingestor = LinkIngestor(engine)
+                    AppLog.log("افزودن", "متن واردشده: ${links.size} لینک استخراج شد")
+                    val ingestor = LinkIngestor(engine) { message ->
+                        AppLog.log("افزودن", message)
+                    }
                     ingestor.ingest(
                         links = links,
                         preset = repo.settings.defaultPreset,
