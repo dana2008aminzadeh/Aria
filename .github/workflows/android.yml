@@ -42,7 +42,7 @@ jobs:
       - name: Test, lint and assemble Android app
         run: |
           set +e
-          ./gradlew testDebugUnitTest lintDebug assembleDebug --console=plain > gradle.log 2>&1
+          ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDiag --console=plain > gradle.log 2>&1
           status=$?
           cat gradle.log
           if [ "$status" -ne 0 ]; then
@@ -80,4 +80,15 @@ jobs:
           name: aria-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
+          if-no-files-found: error
+
+      # Bug-hunting build (see DIAGNOSTICS.md): same app, but every event is recorded to
+      # an exportable log file so testers can download links from all services and send
+      # the complete log back for fixing.
+      - name: Upload diagnostic (diag) APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: alldown-diag-apk
+          path: app/build/outputs/apk/diag/*.apk
+          retention-days: 14
           if-no-files-found: error

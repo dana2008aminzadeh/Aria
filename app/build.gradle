@@ -24,6 +24,9 @@ android {
         versionName "5.4.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
+        // Diagnostic file-logging is OFF everywhere except the dedicated `diag` build type.
+        buildConfigField "boolean", "DIAGNOSTICS", "false"
+
         ndk {
             // The Python runtime is a native component. arm64-v8a covers every current phone;
             // x86_64 is only needed for emulators, so it is left out of the release package
@@ -53,6 +56,18 @@ android {
         }
         debug {
             applicationIdSuffix ".debug"
+        }
+        // Bug-hunting build: identical to debug, but DiagLog persists EVERY event to
+        // filesDir/diagnostics/alldown-diag.log and Settings shows the log viewer/exporter.
+        // It installs side-by-side with the normal app (own queue/settings), so testers can
+        // feed it links from every service and send the exported log back without touching
+        // their real download queue. Build it with: ./gradlew assembleDiag
+        diag {
+            initWith debug
+            applicationIdSuffix ".diag"
+            versionNameSuffix "-diag.1"
+            buildConfigField "boolean", "DIAGNOSTICS", "true"
+            matchingFallbacks = ['debug', 'release']
         }
     }
 

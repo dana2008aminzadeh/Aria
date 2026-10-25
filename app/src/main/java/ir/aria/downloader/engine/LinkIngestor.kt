@@ -1,6 +1,7 @@
 package ir.aria.downloader.engine
 
 import ir.aria.downloader.data.NewDownload
+import ir.aria.downloader.diag.DiagLog
 import ir.aria.downloader.net.FileNames
 import ir.aria.downloader.net.MimeTypes
 import kotlinx.coroutines.CancellationException
@@ -9,8 +10,15 @@ import java.util.Locale
 /** Turns arbitrary links into direct, media, playlist and Spotify queue requests. */
 class LinkIngestor(
     private val engine: ExtractorApi,
-    private val spotifyLookup: (String) -> SpotifyResolver.Collection = SpotifyResolver()::resolve
+    spotifyLookup: ((String) -> SpotifyResolver.Collection)? = null
 ) {
+
+    // The app-wide DiagLog sink (logcat-only no-op outside diag builds); the default Spotify
+    // resolver shares it so embed/oEmbed fetches appear in the same diagnostic timeline.
+    private val spotifyLookup: (String) -> SpotifyResolver.Collection =
+        spotifyLookup ?: SpotifyResolver(log = { DiagLog.d("Spotify", it) })::resolve
+
+    private fun diag(message: String) = DiagLog.i("Ingest", message)
 
     companion object {
         const val MAX_ITEMS = 120
@@ -43,9 +51,17 @@ class LinkIngestor(
         val requests = ArrayList<NewDownload>()
         val warnings = ArrayList<String>()
         var skipped = 0
+        diag(
+            "ingest start: " + links.size + " link(s), preset=" + preset +
+                ", chooser=" + (chooser != null)
+        )
 
         for (rawLink in links) {
             val link = MediaUrlNormalizer.normalize(rawLink)
+            diag(
+                "link raw='" + DiagLog.redactUrl(rawLink) + "' normalized='" +
+                    DiagLog.redactUrl(link) + "' kind=" + UrlClassifier.classify(link)
+            )
             if (requests.size >= MAX_ITEMS) {
                 skipped += links.size - requests.size
                 warnings.add("به سقف $MAX_ITEMS مورد در هر بار رسیدید؛ بقیه لینک‌ها اضافه نشدند.")
@@ -84,10 +100,21 @@ class LinkIngestor(
                             var candidates = primarySearch.hits
                             var searchError = primarySearch.error
                             var match = SpotifyMatcher.bestMatch(track, candidates)
+                            diag(
+                                "spotify track '" + track.title + "' by '" + track.artists +
+                                    "' dur=" + track.durationSec + " query='" + track.query +
+                                    "' candidates=" + candidates.size +
+                                    " searchError='" + searchError + "'" +
+                                    candidates.joinToString("") {
+                                        "\n  cand '" + it.title + "' by '" + it.uploader + "' dur=" +
+                                            it.durationSec + " score=" + SpotifyMatcher.score(track, it)
+                                    } + "\n  chosen=" + (match?.let { "'" + it.hit.title + "' (" + it.score + ")" } ?: "none")
+                            )
                             if (match == null) {
                                 val preciseQuery = SpotifyResolver.preciseQuery(track.title, track.artists)
                                 if (preciseQuery != track.query) {
                                     onStatus("تطبیق دقیق‌تر: ${track.title}")
+                                    diag("spotify precise retry query='" + preciseQuery + "'")
                                     val preciseSearch = engine.search(preciseQuery, 5)
                                     candidates = candidates + preciseSearch.hits
                                     searchError = preciseSearch.error
@@ -139,6 +166,12 @@ class LinkIngestor(
                     EngineKind.MEDIA -> {
                         onStatus("بررسی: $link")
                         val probe = engine.probe(link)
+                        diag(
+                            "media probe ok=" + probe.ok + " extractor=" + probe.extractor +
+                                " title='" + probe.title + "' playlist=" + probe.isPlaylist +
+                                " entries=" + probe.entries.size + " formats=" + probe.formats.size +
+                                " error='" + probe.error + "'"
+                        )
                         if (!probe.ok) {
                             // A transient/cookie failure can still be retried by the service.
                             requests.add(NewDownload(url = link, engine = EngineKind.MEDIA, preset = preset))
@@ -215,9 +248,14 @@ class LinkIngestor(
                 }
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
+                DiagLog.e("Ingest", "link failed: " + DiagLog.redactUrl(link), t)
                 warnings.add("بررسی این لینک ممکن نشد: " + link + " (" + t.javaClass.simpleName + ")")
             }
         }
+        diag(
+            "ingest done: requests=" + requests.size + " skipped=" + skipped +
+                " warnings=" + warnings.size + warnings.joinToString("") { "\n  warn: $it" }
+        )
         return Report(requests, warnings, skipped)
     }
 

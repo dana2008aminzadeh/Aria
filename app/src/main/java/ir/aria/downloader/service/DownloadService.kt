@@ -31,7 +31,7 @@ import ir.aria.downloader.net.MimeTypes
 import ir.aria.downloader.net.Mp4Remuxer
 import ir.aria.downloader.ui.MainActivity
 import ir.aria.downloader.util.Formats
-import android.util.Log
+import ir.aria.downloader.diag.DiagLog
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +74,7 @@ class DownloadService : Service() {
         const val EXTRA_DELETE_FILE = "extra_delete_file"
 
         fun send(context: Context, action: String, id: Long = -1L, deleteFile: Boolean = false) {
+            DiagLog.i("Service", "command send action=" + action.substringAfterLast('.') + " id=$id deleteFile=$deleteFile")
             val intent = Intent(context, DownloadService::class.java).apply {
                 this.action = action
                 putExtra(EXTRA_ID, id)
@@ -83,7 +84,7 @@ class DownloadService : Service() {
                 ContextCompat.startForegroundService(context, intent)
             } catch (e: Exception) {
                 // Background-start restrictions: the queue is persisted and resumes later.
-                Log.e("AriaService", "cannot start foreground service", e)
+                DiagLog.e("Service", "cannot start foreground service", e)
             }
         }
     }
@@ -94,7 +95,7 @@ class DownloadService : Service() {
     private lateinit var repo: DownloadRepository
     private lateinit var settings: Settings
     private val crashGuard = CoroutineExceptionHandler { _, error ->
-        Log.e("AriaService", "unhandled coroutine error", error)
+        DiagLog.e("Service", "unhandled coroutine error", error)
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + crashGuard)
     private val jobs = ConcurrentHashMap<Long, Job>()
@@ -113,16 +114,28 @@ class DownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        DiagLog.init(this)
+        DiagLog.i("Service", "DownloadService.onCreate")
         repo = DownloadRepository.get(this)
         settings = repo.settings
         NotificationSupport.createChannels(this)
         updateNetworkFlags()
+        DiagLog.i(
+            "Service",
+            "networkAvailable=$networkAvailable onWifi=$onWifi concurrency=" + settings.concurrency +
+                " wifiOnly=" + settings.wifiOnly + " items=" + repo.items.value.size
+        )
         startForegroundCompat(buildProgressNotification())
         registerNetworkWatcher()
         requestSchedule()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        DiagLog.d(
+            "Service",
+            "onStartCommand action=" + intent?.action?.substringAfterLast('.') +
+                " id=" + intent?.getLongExtra(EXTRA_ID, -1L) + " startId=" + startId
+        )
         when (intent?.action) {
             ACTION_PAUSE -> handlePause(intent.getLongExtra(EXTRA_ID, -1L))
             ACTION_RESUME, ACTION_RETRY -> handleResume(intent.getLongExtra(EXTRA_ID, -1L))
@@ -143,6 +156,7 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        DiagLog.i("Service", "DownloadService.onDestroy runningJobs=" + jobs.size)
         scope.cancel()
         networkCallback?.let { runCatching { connectivityManager().unregisterNetworkCallback(it) } }
         super.onDestroy()
@@ -162,6 +176,11 @@ class DownloadService : Service() {
 
         val blockedByWifi = settings.wifiOnly && !onWifi
         val blockedByNetwork = !networkAvailable
+        DiagLog.d(
+            "Service",
+            "schedule queued=" + queued.size + " running=" + jobs.size + "/" + settings.concurrency +
+                " blockedByWifi=$blockedByWifi blockedByNetwork=$blockedByNetwork"
+        )
         if ((blockedByWifi || blockedByNetwork) && queued.isNotEmpty()) {
             updateProgressNotification(force = true)
             scheduleIdleStop()
@@ -180,7 +199,7 @@ class DownloadService : Service() {
                 } catch (t: Throwable) {
                     // ANY unexpected failure (python, storage, mp4parser, OEM quirks) is reported
                     // on the item instead of taking the whole app down.
-                    Log.e("AriaService", "item " + item.id + " failed", t)
+                    DiagLog.e("Service", "item " + item.id + " failed", t)
                     runCatching {
                         repo.update(item.id, persist = true) {
                             it.copy(
@@ -208,7 +227,13 @@ class DownloadService : Service() {
         // The job may have been launched a moment before the user pressed pause/delete:
         // never resurrect an entry that is no longer queued.
         if (item.status != DownloadStatus.QUEUED) return
-        Log.d("AriaService", "start item " + id + " (" + item.engine + ", preset=" + item.preset + ")")
+        DiagLog.i(
+            "Service",
+            "start item " + id + " engine=" + item.engine + " preset=" + item.preset +
+                " name='" + item.fileName + "' downloaded=" + item.downloadedBytes +
+                " total=" + item.totalBytes + " attempts=" + item.attempts +
+                " url=" + DiagLog.redactUrl(item.url)
+        )
         repo.update(id, persist = true) {
             it.copy(status = DownloadStatus.RUNNING, speedBps = 0, errorMessage = null)
         }
@@ -222,7 +247,10 @@ class DownloadService : Service() {
     private suspend fun runHttpItem(startItem: DownloadItem) {
         val id = startItem.id
         val part = repo.partFile(id)
-        val downloader = HttpDownloader(settings.userAgent)
+        val downloader = HttpDownloader(
+            userAgent = settings.userAgent,
+            log = { DiagLog.d("Http#" + id, it) }
+        )
         downloaders[id] = downloader
         var item = startItem
         var switched = false
@@ -232,7 +260,9 @@ class DownloadService : Service() {
         val listener = object : HttpDownloader.Listener {
             override fun onMetadata(metadata: HttpDownloader.Metadata) {
                 val type = metadata.contentType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
+                DiagLog.d("Service", "#$id http metadata type=$type total=" + metadata.totalBytes)
                 if (type == "text/html" && !looksLikeWebFile(item.url)) {
+                    DiagLog.w("Service", "#$id direct link returned HTML: switching to media engine")
                     switched = true
                     throw HtmlPageException()
                 }
@@ -283,6 +313,7 @@ class DownloadService : Service() {
                 )
             }
         } catch (e: HttpDownloader.CancelledException) {
+            DiagLog.i("Service", "#$id http cancelled at $currentProgress bytes")
             val current = repo.item(id) ?: return
             if (current.status == DownloadStatus.RUNNING) {
                 repo.update(id, persist = true) { it.copy(status = DownloadStatus.PAUSED, speedBps = 0) }
@@ -302,6 +333,7 @@ class DownloadService : Service() {
     }
 
     private fun finishHttpSuccess(id: Long, part: File) {
+        DiagLog.i("Service", "#$id http transfer complete, part=" + part.length() + " bytes, saving...")
         val item = repo.item(id) ?: run { part.delete(); return }
         if (!part.exists()) {
             repo.update(id, persist = true) {
@@ -313,6 +345,7 @@ class DownloadService : Service() {
         val saved = try {
             FileSaver.save(this, part, item.fileName, item.mimeType, emptySet())
         } catch (e: Exception) {
+            DiagLog.e("Service", "#$id FileSaver.save failed (http)", e)
             repo.update(id, persist = true) {
                 it.copy(status = DownloadStatus.FAILED, errorMessage = "ذخیره فایل ناموفق بود", speedBps = 0)
             }
@@ -352,11 +385,11 @@ class DownloadService : Service() {
         }
 
         val selection = startItem.exactSelection()
-        Log.d("AriaService", "resolve " + startItem.url + " preset=" + startItem.preset +
+        DiagLog.d("Service", "resolve " + startItem.url + " preset=" + startItem.preset +
             " exact=" + (selection?.label ?: "legacy"))
         val plan = engine.resolve(startItem.url, startItem.preset, selection)
         if (!plan.ok) {
-            Log.e("AriaService", "resolve failed: " + plan.error)
+            DiagLog.e("Service", "resolve failed: " + plan.error)
             val message = plan.error ?: getString(R.string.download_failed)
             // Extraction is the flakiest phase on anti-bot sites (Pornhub!): a failed
             // resolve gets the same automatic retry as a failed download instead of
@@ -364,12 +397,19 @@ class DownloadService : Service() {
             if (!scheduleRetry(id, startItem, message)) failItem(id, message)
             return
         }
-        Log.d("AriaService", "plan mode=" + plan.mode + " v=" + plan.videoId + " a=" + plan.audioId + " f=" + plan.formatId)
+        DiagLog.d("Service", "plan mode=" + plan.mode + " v=" + plan.videoId + " a=" + plan.audioId + " f=" + plan.formatId)
         if (shouldCancel()) {
             repo.update(id, persist = true) { it.copy(status = DownloadStatus.PAUSED, speedBps = 0) }
             return
         }
 
+        DiagLog.i(
+            "Service",
+            "#$id plan ready: mode=" + plan.mode + " fmt=" + plan.formatId + " v=" + plan.videoId +
+                " a=" + plan.audioId + " ext=" + plan.ext + " sourceExt=" + plan.sourceExt +
+                " size=" + plan.filesize + " postprocess=" + plan.postprocess +
+                " outputKind=" + plan.outputKind + " work=" + work.absolutePath
+        )
         val ext = plan.ext.lowercase().ifBlank { "mp4" }
         val title = plan.title.ifBlank { startItem.fileName }
         val desiredName = buildFileName(title, ext)
@@ -404,6 +444,7 @@ class DownloadService : Service() {
             }
             val videoFile = File(videoOutcome.files.first().path)
             val baseBytes = videoFile.length()
+            DiagLog.i("Service", "#$id video rendition done: " + videoFile.name + " " + baseBytes + "B")
             val audioOutcome = engine.download(
                 startItem.url, work, plan.audioId, "audio", shouldCancel
             ) { p ->
@@ -419,17 +460,24 @@ class DownloadService : Service() {
                 return
             }
             val audioFile = File(audioOutcome.files.first().path)
+            DiagLog.i("Service", "#$id audio rendition done: " + audioFile.name + " " + audioFile.length() + "B")
 
             val combinedBytes = baseBytes + audioFile.length()
             publish(combinedBytes, if (plannedSize > 0) plannedSize else combinedBytes, 0)
             val merged = File(work, "merged-${id}.$ext")
+            DiagLog.i("Service", "#$id merging into " + merged.name)
             val processed = try {
                 val fast = if (selection == null && ext == "mp4") {
-                    runCatching { Mp4Remuxer.remux(videoFile, audioFile, merged) }.getOrNull()
+                    runCatching {
+                        Mp4Remuxer.remux(videoFile, audioFile, merged)
+                            .also { DiagLog.i("Service", "#$id mp4parser remux ok " + it.durationMs + "ms v='" + it.videoTrack + "' a='" + it.audioTrack + "'") }
+                    }.onFailure {
+                        DiagLog.w("Service", "#$id mp4parser remux failed, falling back to FFmpeg", it)
+                    }.getOrNull()
                 } else null
                 fast?.file ?: MediaProcessor.merge(videoFile, audioFile, merged)
             } catch (e: Exception) {
-                Log.e("AriaService", "merge/transcode failed for item $id", e)
+                DiagLog.e("Service", "merge/transcode failed for item $id", e)
                 null
             }
             if (processed == null) {
@@ -459,6 +507,10 @@ class DownloadService : Service() {
                 return
             }
             val source = File(outcome.files.first().path)
+            DiagLog.i(
+                "Service",
+                "#$id single rendition done: " + source.name + " " + source.length() + "B, postprocess=" + plan.postprocess
+            )
             val processed = try {
                 when (plan.postprocess) {
                     "audio" -> MediaProcessor.convertAudio(
@@ -471,7 +523,7 @@ class DownloadService : Service() {
                     else -> source
                 }
             } catch (e: Exception) {
-                Log.e("AriaService", "output processing failed for item $id", e)
+                DiagLog.e("Service", "output processing failed for item $id", e)
                 failItem(id, getString(R.string.media_processing_failed))
                 return
             }
@@ -499,6 +551,7 @@ class DownloadService : Service() {
         mime: String,
         extraWarning: String?
     ) {
+        DiagLog.i("Service", "#$id finishMedia source=" + source.name + " -> '" + fileName + "' mime=$mime")
         if (!source.exists()) {
             failItem(id, getString(R.string.download_failed))
             return
@@ -507,6 +560,7 @@ class DownloadService : Service() {
         val saved = try {
             FileSaver.save(this, source, fileName, mime, emptySet())
         } catch (e: Exception) {
+            DiagLog.e("Service", "#$id FileSaver.save failed (media)", e)
             failItem(id, "ذخیره فایل ناموفق بود")
             return
         }
@@ -530,6 +584,10 @@ class DownloadService : Service() {
     }
 
     private fun stopMedia(id: Long, outcome: ExtractorEngine.Outcome) {
+        DiagLog.w(
+            "Service",
+            "#$id stopMedia cancelled=" + outcome.cancelled + " error='" + outcome.error + "'"
+        )
         if (outcome.cancelled) {
             val current = repo.item(id) ?: return
             if (current.status == DownloadStatus.RUNNING) {
@@ -549,7 +607,13 @@ class DownloadService : Service() {
      * to fail instantly with no retry at all. Returns true when a retry was scheduled.
      */
     private fun scheduleRetry(id: Long, item: DownloadItem, message: String): Boolean {
+        DiagLog.w(
+            "Service",
+            "#$id scheduleRetry? autoRetry=" + settings.autoRetry + " attempts=" + item.attempts +
+                " message='" + message + "'"
+        )
         if (!settings.autoRetry || item.attempts >= 2) return false
+        DiagLog.i("Service", "#$id retry in " + (4_000L * (item.attempts + 1)) + "ms")
         repo.update(id, persist = true) {
             it.copy(status = DownloadStatus.FAILED, speedBps = 0, errorMessage = message, attempts = it.attempts + 1)
         }
@@ -565,6 +629,7 @@ class DownloadService : Service() {
     }
 
     private fun failItem(id: Long, message: String) {
+        DiagLog.e("Service", "#$id FAILED: $message")
         repo.update(id, persist = true) {
             it.copy(status = DownloadStatus.FAILED, speedBps = 0, errorMessage = message)
         }
@@ -574,6 +639,11 @@ class DownloadService : Service() {
     // ================================================================== errors
 
     private fun handleError(id: Long, error: IOException, wifiLost: Boolean, downloaded: Long) {
+        DiagLog.e(
+            "Service",
+            "#$id http error wifiLost=$wifiLost downloaded=$downloaded network=$networkAvailable",
+            error
+        )
         val item = repo.item(id) ?: return
         if (item.status == DownloadStatus.PAUSED || item.status == DownloadStatus.CANCELED) return
 
@@ -657,6 +727,7 @@ class DownloadService : Service() {
     // ================================================================== commands
 
     private fun handlePause(id: Long) {
+        DiagLog.i("Service", "handlePause #$id")
         if (id <= 0) return
         scope.launch {
             val item = repo.item(id) ?: return@launch
@@ -671,6 +742,7 @@ class DownloadService : Service() {
     }
 
     private fun handleResume(id: Long) {
+        DiagLog.i("Service", "handleResume #$id")
         if (id <= 0) return
         scope.launch {
             val item = repo.item(id) ?: return@launch
@@ -690,6 +762,7 @@ class DownloadService : Service() {
     }
 
     private fun handleDelete(id: Long, deleteFile: Boolean) {
+        DiagLog.i("Service", "handleDelete #$id deleteFile=$deleteFile")
         if (id <= 0) return
         scope.launch {
             downloaders[id]?.abort()
@@ -702,6 +775,7 @@ class DownloadService : Service() {
     }
 
     private fun handlePauseAll() {
+        DiagLog.i("Service", "handlePauseAll")
         scope.launch {
             for (item in repo.items.value) {
                 if (item.status == DownloadStatus.RUNNING || item.status == DownloadStatus.QUEUED) {
@@ -716,6 +790,7 @@ class DownloadService : Service() {
     }
 
     private fun handleResumeAll() {
+        DiagLog.i("Service", "handleResumeAll")
         scope.launch {
             for (item in repo.items.value) {
                 if (item.status == DownloadStatus.PAUSED || item.status == DownloadStatus.FAILED) {
@@ -735,6 +810,8 @@ class DownloadService : Service() {
     }
 
     private fun handleSettingsChanged() {
+        DiagLog.i("Service", "handleSettingsChanged concurrency=" + settings.concurrency +
+            " notifications=" + settings.notificationsEnabled)
         if (!settings.notificationsEnabled) {
             val manager = NotificationManagerCompat.from(this)
             for (item in repo.items.value) {
@@ -746,6 +823,7 @@ class DownloadService : Service() {
     }
 
     private fun handleClearCompleted(deleteFiles: Boolean) {
+        DiagLog.i("Service", "handleClearCompleted deleteFiles=$deleteFiles")
         scope.launch {
             for (item in repo.items.value) {
                 if (item.status == DownloadStatus.COMPLETED) {
@@ -793,17 +871,20 @@ class DownloadService : Service() {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 updateNetworkFlags()
+                DiagLog.i("Service", "network AVAILABLE wifi=$onWifi available=$networkAvailable")
                 resumeAutoPaused()
                 requestSchedule()
             }
 
             override fun onLost(network: Network) {
                 updateNetworkFlags()
+                DiagLog.w("Service", "network LOST wifi=$onWifi available=$networkAvailable")
                 requestSchedule()
             }
 
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
                 updateNetworkFlags()
+                DiagLog.d("Service", "network caps wifi=$onWifi available=$networkAvailable")
                 if (networkAvailable) {
                     resumeAutoPaused()
                     requestSchedule()
@@ -815,6 +896,7 @@ class DownloadService : Service() {
     }
 
     private fun resumeAutoPaused() {
+        DiagLog.d("Service", "resumeAutoPaused check network=$networkAvailable wifi=$onWifi wifiOnly=" + settings.wifiOnly)
         if (!networkAvailable) return
         if (settings.wifiOnly && !onWifi) return
         val candidates = repo.items.value.filter { it.status == DownloadStatus.PAUSED && !it.pausedByUser }
@@ -911,7 +993,7 @@ class DownloadService : Service() {
                 startForeground(FOREGROUND_ID, notification)
             }
         } catch (typedError: Exception) {
-            Log.e("AriaService", "startForeground(dataSync) failed, retrying untyped", typedError)
+            DiagLog.e("Service", "startForeground(dataSync) failed, retrying untyped", typedError)
             try {
                 // Some Android 14+ builds refuse the dataSync type for sideloaded apps; a plain
                 // foreground notification still lets the download run.
@@ -929,7 +1011,7 @@ class DownloadService : Service() {
         // If we stay alive after a failed startForeground() the system kills the whole app
         // with "did not start in time". Stopping ourselves keeps the queue safe on disk and
         // the app usable; the next start retries.
-        Log.e("AriaService", "startForeground failed", e)
+        DiagLog.e("Service", "startForeground failed", e)
         foregroundShown = false
         runCatching { stopSelf() }
     }
@@ -955,7 +1037,7 @@ class DownloadService : Service() {
                 val now = android.os.SystemClock.uptimeMillis()
                 if (now - lastNotificationErrorAt > 60_000) {
                     lastNotificationErrorAt = now
-                    Log.e("AriaService", "cannot post notification $id", error)
+                    DiagLog.e("Service", "cannot post notification $id", error)
                 }
             }
     }
@@ -964,6 +1046,7 @@ class DownloadService : Service() {
         NotificationSupport.canPostResultNotifications(this)
 
     private fun notifyCompleted(id: Long) {
+        DiagLog.d("Service", "#$id notifyCompleted enabled=" + settings.notificationsEnabled + " canPost=" + canPostNotifications())
         if (!settings.notificationsEnabled) return
         if (!canPostNotifications()) return
         val item = repo.item(id) ?: return
@@ -990,6 +1073,7 @@ class DownloadService : Service() {
     }
 
     private fun notifyFailed(id: Long) {
+        DiagLog.d("Service", "#$id notifyFailed enabled=" + settings.notificationsEnabled + " canPost=" + canPostNotifications())
         if (!settings.notificationsEnabled) return
         if (!canPostNotifications()) return
         val item = repo.item(id) ?: return
@@ -1022,6 +1106,7 @@ class DownloadService : Service() {
             scheduleIdleStop()
             return
         }
+        DiagLog.i("Service", "idle: stopping service (queue drained)")
         idleStopJob?.cancel()
         stopForegroundCompat()
         stopSelf()

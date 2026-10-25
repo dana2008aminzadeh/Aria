@@ -9,6 +9,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
+import ir.aria.downloader.diag.DiagLog
 import ir.aria.downloader.model.DownloadItem
 import ir.aria.downloader.net.FileNames
 import java.io.File
@@ -26,11 +27,20 @@ object FileSaver {
      */
     fun save(context: Context, temp: File, suggestedName: String, mime: String, taken: Set<String>): Saved {
         val name = FileNames.ensureUnique(suggestedName, taken)
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        DiagLog.i(
+            "FileSaver",
+            "save '" + suggestedName + "' -> '" + name + "' mime=" + mime +
+                " bytes=" + temp.length() + " via=" +
+                (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "MediaStore" else "publicDir") +
+                " dest=Download/" + SUB_FOLDER
+        )
+        val saved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             saveWithMediaStore(context, temp, name, mime)
         } else {
             saveToPublicDir(temp, name)
         }
+        DiagLog.i("FileSaver", "saved '" + saved.displayName + "' uri=" + saved.uri)
+        return saved
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -55,6 +65,7 @@ object FileSaver {
             val finalName = queryDisplayName(context, uri) ?: name
             return Saved(uri.toString(), finalName)
         } catch (e: Exception) {
+            DiagLog.e("FileSaver", "MediaStore save failed for '$name'", e)
             runCatching { resolver.delete(uri, null, null) }
             throw e
         }
@@ -113,6 +124,7 @@ object FileSaver {
 
     fun delete(context: Context, item: DownloadItem): Boolean {
         val uri = item.fileUri ?: return false
+        DiagLog.i("FileSaver", "delete #" + item.id + " '" + item.fileName + "' uri=" + uri)
         return try {
             if (uri.startsWith("content://")) {
                 context.contentResolver.delete(Uri.parse(uri), null, null) > 0
@@ -120,11 +132,13 @@ object FileSaver {
                 File(uri).delete()
             }
         } catch (e: Exception) {
+            DiagLog.e("FileSaver", "delete failed #" + item.id, e)
             false
         }
     }
 
     fun openIntent(context: Context, item: DownloadItem): Intent? {
+        DiagLog.d("FileSaver", "open #" + item.id + " '" + item.fileName + "' uri=" + item.fileUri)
         val raw = item.fileUri ?: return null
         val uri: Uri = if (raw.startsWith("content://")) {
             Uri.parse(raw)

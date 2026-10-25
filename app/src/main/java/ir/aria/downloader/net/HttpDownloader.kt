@@ -16,8 +16,15 @@ import java.net.URL
 class HttpDownloader(
     private val userAgent: String = DEFAULT_USER_AGENT,
     private val connectTimeoutMs: Int = 20_000,
-    private val readTimeoutMs: Int = 30_000
+    private val readTimeoutMs: Int = 30_000,
+    /** Optional diagnostics sink (DownloadService forwards to DiagLog, which redacts
+     *  signed-url tokens before writing; keeps this class pure-JVM/testable). */
+    private val log: ((String) -> Unit)? = null
 ) {
+
+    private fun diag(message: String) {
+        log?.invoke(message)
+    }
 
     data class Metadata(
         val finalUrl: String,
@@ -45,6 +52,7 @@ class HttpDownloader(
 
     /** Aborts the transfer from another thread. The blocked read is released by disconnecting. */
     fun abort() {
+        diag("abort() requested")
         aborted = true
         runCatching { connection?.disconnect() }
     }
@@ -58,19 +66,27 @@ class HttpDownloader(
         target.parentFile?.mkdirs()
         var resumeFrom = if (target.exists()) target.length() else 0L
         var attempt = 0
+        diag(
+            "download start url=" + url.take(300) + " target=" + target.name +
+                " resumeFrom=" + resumeFrom + " validator=" + (validator ?: "(none)")
+        )
 
         while (attempt++ < 3) {
             checkAborted()
+            diag("attempt $attempt resumeFrom=$resumeFrom")
             val conn = open(url, resumeFrom, validator)
             val code = try {
                 conn.responseCode
             } catch (e: IOException) {
+                diag("responseCode failed: " + e.javaClass.simpleName + " " + e.message)
                 conn.disconnect()
                 if (aborted) throw CancelledException()
                 throw e
             }
+            diag("HTTP $code finalUrl=" + conn.url.toString().take(300))
 
             if (code == 416 && resumeFrom > 0) {
+                diag("416 for partial file: deleting and restarting from zero")
                 // The partial file does not match the remote file any more: start over.
                 conn.disconnect()
                 target.delete()
@@ -87,7 +103,9 @@ class HttpDownloader(
             var total: Long
             if (partial) {
                 val range = parseContentRange(conn.getHeaderField("Content-Range"))
+                diag("206 Content-Range=" + conn.getHeaderField("Content-Range") + " parsed=$range")
                 if (range == null || range.first != resumeFrom) {
+                    diag("range mismatch (wanted $resumeFrom): deleting partial and restarting")
                     conn.disconnect()
                     target.delete()
                     resumeFrom = 0
@@ -97,6 +115,7 @@ class HttpDownloader(
                 total = range.second
             } else {
                 // Server ignored our Range header (or this is a fresh download): restart at 0.
+                if (resumeFrom > 0) diag("server ignored Range (HTTP $code): restarting from zero")
                 startAt = 0
                 total = conn.contentLengthLong
             }
@@ -110,9 +129,15 @@ class HttpDownloader(
                 contentDisposition = conn.getHeaderField("Content-Disposition"),
                 contentType = conn.getHeaderField("Content-Type")
             )
+            diag(
+                "metadata total=" + meta.totalBytes + " resumable=" + meta.resumable +
+                    " type=" + meta.contentType + " disposition=" + meta.contentDisposition +
+                    " etag=" + meta.etag + " lastModified=" + meta.lastModified
+            )
             try {
                 listener.onMetadata(meta)
             } catch (e: Exception) {
+                diag("listener.onMetadata threw " + e.javaClass.simpleName + ": " + e.message)
                 runCatching { conn.inputStream?.close() }
                 conn.disconnect()
                 connection = null
@@ -121,7 +146,12 @@ class HttpDownloader(
 
             try {
                 stream(conn, target, startAt, total, listener)
+                diag("download finished bytes=" + target.length())
             } catch (e: IOException) {
+                diag(
+                    "stream failed after " + target.length() + " bytes: " +
+                        e.javaClass.simpleName + " " + e.message + " aborted=" + aborted
+                )
                 if (aborted) throw CancelledException()
                 throw e
             } finally {
@@ -149,6 +179,8 @@ class HttpDownloader(
             var windowStart = System.currentTimeMillis()
             var windowBytes = 0L
             var lastEmit = windowStart
+            var lastMilestone = -1
+            diag("streaming from $startAt of $total bytes")
 
             while (true) {
                 if (aborted) throw CancelledException()
@@ -168,6 +200,16 @@ class HttpDownloader(
                     val speed = windowBytes * 1000 / elapsed
                     val eta = if (total > 0 && speed > 0) (total - downloaded) / speed else -1
                     listener.onProgress(downloaded, total, speed, eta)
+                    if (total > 0) {
+                        val milestone = ((downloaded * 100 / total) / 10).toInt()
+                        if (milestone != lastMilestone) {
+                            lastMilestone = milestone
+                            diag(
+                                "progress " + (downloaded * 100 / total) + "% (" + downloaded +
+                                    "/" + total + ") speed=" + speed + "B/s eta=" + eta + "s"
+                            )
+                        }
+                    }
                     windowStart = now
                     windowBytes = 0
                     lastEmit = now
@@ -214,7 +256,9 @@ class HttpDownloader(
                 val location = conn.getHeaderField("Location")
                 conn.disconnect()
                 if (location.isNullOrBlank()) throw IOException("redirect without location header")
-                current = resolve(current, location)
+                val next = resolve(current, location)
+                diag("redirect HTTP $code hop " + (hops + 1) + " -> " + next.take(300))
+                current = next
                 if (++hops > 10) throw IOException("too many redirects")
                 continue
             }

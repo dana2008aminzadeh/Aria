@@ -19,8 +19,14 @@ class SpotifyResolver(
     private val userAgent: String = DEFAULT_UA,
     private val connectTimeoutMs: Int = 15_000,
     private val readTimeoutMs: Int = 20_000,
-    private val fetcher: ((String) -> String)? = null
+    private val fetcher: ((String) -> String)? = null,
+    /** Optional diagnostics sink (LinkIngestor forwards to DiagLog in the app). */
+    private val log: ((String) -> Unit)? = null
 ) {
+
+    private fun diag(message: String) {
+        log?.invoke(message)
+    }
 
     data class Track(
         val title: String,
@@ -120,7 +126,10 @@ class SpotifyResolver(
     /** Parses the embedded JSON of a spotify embed page. Pure function, unit tested. */
     fun parseEmbed(html: String): Collection {
         val match = NEXT_DATA.find(html)
-            ?: return Collection(false, "", emptyList(), "صفحهٔ اسپاتیفای قابل خواندن نبود")
+        if (match == null) {
+            diag("parseEmbed: __NEXT_DATA__ not found (html " + html.length + " chars)")
+            return Collection(false, "", emptyList(), "صفحهٔ اسپاتیفای قابل خواندن نبود")
+        }
         return try {
             val root = JSONObject(match.groupValues[1])
             val directEntity = root
@@ -165,20 +174,30 @@ class SpotifyResolver(
                     durationSec = durationOf(entity)
                 ))
             }
+            diag(
+                "parseEmbed: name='" + name + "' tracks=" + tracks.size + tracks.take(5)
+                    .joinToString(" | ") { "'" + it.title + "' by '" + it.artists + "' dur=" + it.durationSec }
+            )
             if (tracks.isEmpty()) {
                 Collection(false, name, emptyList(), "ترکی در این لینک پیدا نشد (شاید پادکست یا آرتیست باشد)")
             } else {
                 Collection(true, name, tracks)
             }
         } catch (e: Exception) {
+            diag("parseEmbed exception: " + e.javaClass.simpleName + " " + e.message)
             Collection(false, "", emptyList(), "خواندن اطلاعات اسپاتیفای ناموفق بود")
         }
     }
 
     /** Fetches and parses a spotify url (track / album / playlist). Blocking: call on IO. */
     fun resolve(url: String): Collection = try {
-        resolveUnsafe(url)
+        diag("resolve start url=" + url)
+        val result = resolveUnsafe(url)
+        diag("resolve done ok=" + result.ok + " name='" + result.name + "' tracks=" + result.tracks.size +
+            " error='" + result.error + "'")
+        result
     } catch (t: Throwable) {
+        diag("resolve exception: " + t.javaClass.simpleName + " " + t.message)
         Collection(false, "", emptyList(), "خواندن اطلاعات اسپاتیفای ناموفق بود")
     }
 
@@ -193,20 +212,26 @@ class SpotifyResolver(
             )
         }
         val embedUrl = "https://open.spotify.com/embed/$type/$id"
+        diag("type=$type id=$id embed=$embedUrl")
         val parsed = try {
             parseEmbed(httpGet(embedUrl))
         } catch (e: Exception) {
+            diag("embed fetch failed: " + e.javaClass.simpleName + " " + e.message)
             null
         }
         if (parsed?.ok == true) return parsed
+        diag("embed path not usable (parsed ok=" + parsed?.ok + ", error='" + parsed?.error + "')")
 
         // oEmbed cannot provide album/playlist entries or duration, but it is a useful
         // independent public metadata path for one track when the embed layout/API changes.
         if (type == "track") {
+            diag("trying oEmbed fallback for single track")
             val fallback = resolveViaOEmbed(url)
             if (fallback != null) {
+                diag("oEmbed fallback ok: '" + fallback.title + "' by '" + fallback.artists + "'")
                 return Collection(true, fallback.title, listOf(fallback))
             }
+            diag("oEmbed fallback returned nothing")
         }
         return parsed ?: Collection(false, "", emptyList(), "اتصال به اسپاتیفای ناموفق بود")
     }
@@ -220,6 +245,7 @@ class SpotifyResolver(
             val author = json.optString("author_name")
             Track(title, author, buildQuery(title, author))
         } catch (e: Exception) {
+            diag("oEmbed exception: " + e.javaClass.simpleName + " " + e.message)
             null
         }
     }
@@ -239,6 +265,7 @@ class SpotifyResolver(
                 setRequestProperty("Accept", "text/html,application/json;q=0.9,*/*;q=0.8")
             }
             val code = connection.responseCode
+            diag("GET " + current.take(200) + " -> HTTP " + code)
             if (code in 300..399) {
                 val location = connection.getHeaderField("Location") ?: ""
                 connection.disconnect()
@@ -254,6 +281,7 @@ class SpotifyResolver(
                 it.readText()
             }
             connection.disconnect()
+            diag("GET body " + body.length + " chars")
             return body
         }
         throw IllegalStateException("too many redirects")
