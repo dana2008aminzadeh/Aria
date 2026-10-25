@@ -163,4 +163,18 @@
     <string name="nav_queue">صف دانلود</string>
     <string name="nav_downloads">دانلودها</string>
     <string name="nav_profile">پروفایل</string>
+
+    <string name="recent_downloads">دانلودهای اخیر</string>
+    <string name="subscription">اشتراک‌ها</string>
+    <string name="subscription_title">AllDown پرمیوم</string>
+    <string name="subscription_sub">بدون محدودیت، با حداکثر سرعت</string>
+    <string name="plan_free">رایگان</string>
+    <string name="plan_free_desc">دانلود پایه از همهٔ سرویس‌ها</string>
+    <string name="plan_monthly">پرمیوم ماهانه</string>
+    <string name="plan_yearly">پرمیوم سالانه</string>
+    <string name="price_monthly">۹۹٬۰۰۰ تومان / ماه</string>
+    <string name="price_yearly">۹۹۰٬۰۰۰ تومان / سال</string>
+    <string name="price_demo_note">قیمت نمایشی است و بعداً اصلاح می‌شود</string>
+    <string name="coming_soon">به‌زودی</string>
+    <string name="current_plan">پلن فعلی</string>
 </resources>

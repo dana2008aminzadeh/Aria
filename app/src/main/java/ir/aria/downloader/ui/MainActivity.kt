@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         binding.emptyAddButton.setOnClickListener { openAddScreen() }
 
         setupHome()
+        binding.shortcutGrid.post { binding.shortcutGrid.startLayoutAnimation() }
         observeQueue()
         requestPermissionsIfNeeded()
     }
@@ -99,34 +100,53 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------------------------------ setup
 
     private fun setupHeader() {
-        binding.headerMenu.setOnClickListener { view -> showHeaderMenu(view) }
-        binding.headerPremium.setOnClickListener { showAbout() }
+        binding.headerMenu.setOnClickListener { view ->
+            // little spin so the button itself feels alive
+            view.animate().rotationBy(90f).setDuration(220).start()
+            showHeaderMenu()
+        }
+        binding.headerPremium.setOnClickListener {
+            startActivity(Intent(this, SubscriptionActivity::class.java))
+        }
     }
 
-    private fun showHeaderMenu(anchor: android.view.View) {
-        val popup = android.widget.PopupMenu(this, anchor)
-        popup.menu.add(0, 1, 0, R.string.settings)
-        popup.menu.add(0, 2, 1, R.string.pause_all)
-        popup.menu.add(0, 3, 2, R.string.resume_all)
-        popup.menu.add(0, 4, 3, R.string.clear_completed)
-        popup.menu.add(0, 5, 4, R.string.about)
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                1 -> { startActivity(Intent(this, SettingsActivity::class.java)); true }
-                2 -> {
-                    DownloadService.send(this, DownloadService.ACTION_PAUSE_ALL)
-                    Toast.makeText(this, R.string.pause_all, Toast.LENGTH_SHORT).show(); true
-                }
-                3 -> {
-                    DownloadService.send(this, DownloadService.ACTION_RESUME_ALL)
-                    Toast.makeText(this, R.string.resume_all, Toast.LENGTH_SHORT).show(); true
-                }
-                4 -> { confirmClearCompleted(); true }
-                5 -> { showAbout(); true }
-                else -> false
+    /** Animated clay menu (replaces the plain system popup). */
+    private fun showHeaderMenu() {
+        val dialog = android.app.Dialog(this)
+        dialog.setContentView(R.layout.dialog_main_menu)
+        dialog.window?.let { window ->
+            window.setBackgroundDrawableResource(android.R.color.transparent)
+            window.attributes = window.attributes.apply {
+                gravity = android.view.Gravity.TOP or android.view.Gravity.END
+                y = (64 * resources.displayMetrics.density).toInt()
+                x = (12 * resources.displayMetrics.density).toInt()
+            }
+            window.setWindowAnimations(R.style.DialogMenuAnim)
+        }
+        fun close(action: () -> Unit) { dialog.dismiss(); action() }
+        dialog.findViewById<View>(R.id.menuSubscription).setOnClickListener {
+            close { startActivity(Intent(this, SubscriptionActivity::class.java)) }
+        }
+        dialog.findViewById<View>(R.id.menuSettings).setOnClickListener {
+            close { startActivity(Intent(this, SettingsActivity::class.java)) }
+        }
+        dialog.findViewById<View>(R.id.menuPauseAll).setOnClickListener {
+            close {
+                DownloadService.send(this, DownloadService.ACTION_PAUSE_ALL)
+                Toast.makeText(this, R.string.pause_all, Toast.LENGTH_SHORT).show()
             }
         }
-        popup.show()
+        dialog.findViewById<View>(R.id.menuResumeAll).setOnClickListener {
+            close {
+                DownloadService.send(this, DownloadService.ACTION_RESUME_ALL)
+                Toast.makeText(this, R.string.resume_all, Toast.LENGTH_SHORT).show()
+            }
+        }
+        dialog.findViewById<View>(R.id.menuClearCompleted).setOnClickListener {
+            close { confirmClearCompleted() }
+        }
+        dialog.findViewById<View>(R.id.menuAbout).setOnClickListener { close { showAbout() } }
+        dialog.show()
     }
 
     private fun showAbout() {
@@ -155,14 +175,36 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.groupAddButton.setOnClickListener { openAddScreen() }
-        binding.shortcutDirect.setOnClickListener { openAddScreen(platformHint = "لینک مستقیم را وارد کنید") }
-        binding.shortcutYoutube.setOnClickListener { openAddScreen(platformHint = "لینک یوتیوب را وارد کنید") }
-        binding.shortcutSpotify.setOnClickListener { openAddScreen(platformHint = "لینک اسپاتیفای را وارد کنید") }
-        binding.shortcutInstagram.setOnClickListener { openAddScreen(platformHint = "لینک اینستاگرام را وارد کنید") }
-        binding.shortcutPornhub.setOnClickListener { openAddScreen(platformHint = "لینک Pornhub را وارد کنید") }
-        binding.navHome.setOnClickListener { setFilter(Filter.ALL) }
-        binding.navQueue.setOnClickListener { setFilter(Filter.ACTIVE) }
-        binding.navDownloads.setOnClickListener { setFilter(Filter.COMPLETED) }
+        val shortcuts = listOf(
+            binding.shortcutDirect to "لینک مستقیم را وارد کنید",
+            binding.shortcutYoutube to "لینک یوتیوب را وارد کنید",
+            binding.shortcutSpotify to "لینک اسپاتیفای را وارد کنید",
+            binding.shortcutInstagram to "لینک اینستاگرام را وارد کنید",
+            binding.shortcutTiktok to "لینک TikTok را وارد کنید",
+            binding.shortcutX to "لینک X را وارد کنید",
+            binding.shortcutFacebook to "لینک فیس‌بوک را وارد کنید",
+            binding.shortcutAparat to "لینک آپارات را وارد کنید",
+            binding.shortcutSoundcloud to "لینک SoundCloud را وارد کنید",
+            binding.shortcutVimeo to "لینک Vimeo را وارد کنید",
+            binding.shortcutTwitch to "لینک Twitch را وارد کنید",
+            binding.shortcutPinterest to "لینک Pinterest را وارد کنید",
+            binding.shortcutReddit to "لینک Reddit را وارد کنید",
+            binding.shortcutPornhub to "لینک Pornhub را وارد کنید"
+        )
+        for ((view, hint) in shortcuts) {
+            view.setOnClickListener {
+                view.animate().scaleX(0.94f).scaleY(0.94f).setDuration(90).withEndAction {
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
+                    openAddScreen(platformHint = hint)
+                }.start()
+            }
+        }
+        binding.navHome.setOnClickListener {
+            binding.homeScroll.smoothScrollTo(0, 0)
+        }
+        binding.seeAllButton.setOnClickListener { openDownloadsList(DownloadsListActivity.MODE_ALL) }
+        binding.navQueue.setOnClickListener { openDownloadsList(DownloadsListActivity.MODE_QUEUE) }
+        binding.navDownloads.setOnClickListener { openDownloadsList(DownloadsListActivity.MODE_COMPLETED) }
         binding.navAdd.setOnClickListener { openAddScreen() }
         binding.navProfile.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -279,7 +321,8 @@ class MainActivity : AppCompatActivity() {
                     item.url.contains(query, true) ||
                     (item.title?.contains(query, true) == true)
             }
-            .sortedWith(compareBy({ statusRank(it.status) }, { -it.createdAt }))
+            .sortedByDescending { it.createdAt }
+            .take(5)
             .toList()
         adapter.submitList(filtered)
         binding.emptyState.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
@@ -514,6 +557,13 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun openDownloadsList(mode: String) {
+        startActivity(
+            Intent(this, DownloadsListActivity::class.java)
+                .putExtra(DownloadsListActivity.EXTRA_MODE, mode)
+        )
     }
 
     private fun openAddScreen(prefill: String? = null, platformHint: String? = null) {
