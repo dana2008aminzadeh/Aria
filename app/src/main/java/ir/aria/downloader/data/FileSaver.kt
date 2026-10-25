@@ -18,10 +18,10 @@ object FileSaver {
 
     data class Saved(val uri: String, val displayName: String)
 
-    const val SUB_FOLDER = "AriaDownloader"
+    const val SUB_FOLDER = "AllDown"
 
     /**
-     * Copies [temp] into `Downloads/AriaDownloader/` and returns the resulting uri.
+     * Copies [temp] into `Downloads/AllDown/` and returns the resulting uri.
      * Uses MediaStore on API 29+ (no permission needed) and direct file IO below that.
      */
     fun save(context: Context, temp: File, suggestedName: String, mime: String, taken: Set<String>): Saved {

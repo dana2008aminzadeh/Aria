@@ -100,6 +100,6 @@
             android:layout_marginTop="10dp"
             android:text="@string/format_conversion_note"
             android:textColor="@color/aria_text_dim"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
     </LinearLayout>
 </ScrollView>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">آریا دانلودر</string>
+    <string name="app_name">AllDown</string>
     <string name="add_downloads">افزودن دانلود</string>
     <string name="settings">تنظیمات</string>
     <string name="downloads">دانلودها</string>
@@ -47,7 +47,7 @@
     <string name="auto_retry">تلاش خودکار مجدد</string>
     <string name="auto_retry_desc">در صورت قطع اتصال، دانلود دوباره ادامه پیدا می‌کند</string>
     <string name="save_folder">پوشه ذخیره</string>
-    <string name="save_folder_value">Download/AriaDownloader</string>
+    <string name="save_folder_value">Download/AllDown</string>
     <string name="about">درباره</string>
     <string name="version">نسخه</string>
     <string name="permission_notif">برای دیدن پیشرفت و اعلان پایان، اجازهٔ اعلان را فعال کنید. اگر قبلاً «رد کردن» را زده‌اید، از تنظیمات سیستم اعلان‌های آریا و کانال «پایان دانلود» را روشن کنید.</string>
@@ -73,13 +73,13 @@
     <string name="stats">%1$d دانلود • %2$s</string>
     <string name="select_mode">حالت انتخاب</string>
     <string name="batch_pattern_hint">الگو: https://site.com/file{1-10}.jpg</string>
-    <string name="about_text">مدیریت دانلود کامل با دو موتور: دانلود مستقیم (HTTP با ادامهٔ دانلود) و موتور استخراج yt-dlp برای بیش از هزار سایت ویدیو/موسیقی (یوتیوب، اینستاگرام، تیک‌تاک، ساندکلاد، توییتر، پورن‌هاب و…). برای دانلود فقط از محتوایی استفاده کنید که اجازه یا مالکیت آن را دارید.</string>
+    <string name="about_text">AllDown — مدیریت دانلود کامل با دو موتور: دانلود مستقیم (HTTP با ادامهٔ دانلود) و موتور استخراج yt-dlp برای بیش از هزار سایت ویدیو/موسیقی (یوتیوب، اینستاگرام، تیک‌تاک، ساندکلاد، توییتر، پورن‌هاب و…). برای دانلود فقط از محتوایی استفاده کنید که اجازه یا مالکیت آن را دارید.</string>
     <string name="clear">پاک کردن</string>
     <string name="done">تمام</string>
     <string name="queue_info">%1$s از %2$s</string>
     <string name="already_added">این لینک‌ها قبلاً در صف هستند</string>
     <string name="concurrency_value">تعداد دانلود همزمان: %1$d</string>
-    <string name="version_format">آریا دانلودر • نسخه %1$s</string>
+    <string name="version_format">AllDown • نسخه %1$s</string>
 
     <!-- v2: media engine -->
     <string name="quality">کیفیت</string>
