@@ -267,7 +267,7 @@ object DiagLog {
         return result
     }
 
-    /** `http://user:pass@127.0.0.1:8080` -> `http://***@127.0.0.1:8080` so the endpoint stays debuggable. */
+    /** Masks the user:password authority of a proxy url; scheme/host/port stay debuggable. */
     fun redactProxy(proxy: String?): String {
         val value = proxy?.trim().orEmpty()
         if (value.isEmpty()) return "(none)"
