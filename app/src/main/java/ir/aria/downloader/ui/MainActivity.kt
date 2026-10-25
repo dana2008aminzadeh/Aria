@@ -181,7 +181,11 @@ class MainActivity : AppCompatActivity() {
         binding.filterChips.check(chipId)
         clearSelection()
         refreshList()
-        binding.recycler.scrollToPosition(0)
+        // The whole home page scrolls (hero included); bring the queue into view.
+        binding.homeScroll.post {
+            val y = binding.queueTitle.top - (8 * resources.displayMetrics.density).toInt()
+            binding.homeScroll.smoothScrollTo(0, y.coerceAtLeast(0))
+        }
     }
 
     private fun setupList() {

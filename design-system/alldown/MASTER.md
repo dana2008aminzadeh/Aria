@@ -244,3 +244,17 @@ The generated "Style" section above is superseded by the user's explicit directi
 - **Typography:** Nunito/DM-Sans mood → Android `sans-serif` bold headings (28sp hero / 20sp section / 16sp card title), body 14sp, minimum label 11sp, line spacing 1.3+.
 - **Icons:** vector drawables only — no emoji as structural icons. Touch targets ≥48dp, 8dp spacing rhythm.
 - **Pages in scope:** Home (hero+direct+shortcuts+group+queue+bottom nav), Add, Settings, Format chooser, Details, Rename, download item, launcher icon.
+
+---
+
+## AllDown 5.0 Override — Dark Premium Clay (Pet Services demo direction, user-directed)
+
+Reference demo inside the skill: **Pet Services / Pet Grooming & Spa — Claymorphism + Vibrant & Block-based**.
+Adapt that demo's *form language* (not its pet content) to a dark premium downloader:
+
+- **Dark canvas:** background `#121017`, raised clay surface `#211D2B`, higher surface `#2A2438`, clay border/highlight `#3A3350`, primary text `#F7F2EA`, muted text `#C9BBA6` (≥4.5:1 on surfaces).
+- **Clay on dark:** radius 24dp cards / 20dp buttons, 2dp highlight border `rgba(255,255,255,0.08)` equivalent, outer elevation 6–10dp + inner top highlight strip, soft press (ripple + 200ms).
+- **Vibrant blocks stay saturated:** coral/orange primary `#FF8A3D`→CTA `#E85D04`, YouTube `#FF3355`, Spotify `#1DB954`, Instagram `#F43F8E`, blue `#4D7CFE`, mint `#3ECF8E`, lilac `#9B8CFF`, lemon `#FFC94D` — as chunky tiles on dark clay.
+- **Whole home scrolls:** hero, shortcuts, group, stats and queue live in ONE `NestedScrollView`; only the bottom navigation stays fixed. Nothing but the nav is pinned — the page must never feel static/frozen.
+- **Pet-demo composition:** greeting header with round avatar-like tile, big rounded bold headline, one hero clay card, a row/grid of chunky colorful service blocks, a wide featured clay card, then a soft list — with 16/24dp section rhythm and generous padding.
+- Touch targets ≥48dp, vector icons only, pastel info blocks keep dark text `#2E1A0A`.

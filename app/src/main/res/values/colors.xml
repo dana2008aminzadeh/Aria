@@ -1,31 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- AllDown 4.0 — Claymorphism + Vibrant & Block-based (UI/UX Pro Max). -->
-    <color name="aria_primary">#E85D04</color>
-    <color name="aria_primary_bright">#F97316</color>
-    <color name="aria_primary_dark">#C2410C</color>
-    <color name="aria_accent_blue">#2563EB</color>
-    <color name="aria_hero_end">#FF9E2C</color>
-    <color name="aria_bg">#FFF6EC</color>
-    <color name="aria_surface">#FFFFFF</color>
-    <color name="aria_surface2">#FFEEDD</color>
-    <color name="aria_clay_border">#FFDDBE</color>
-    <color name="aria_text">#2E1A0A</color>
-    <color name="aria_text_dim">#6E5942</color>
-    <color name="aria_green">#1DB954</color>
-    <color name="aria_red">#DC2626</color>
-    <color name="aria_orange">#E85D04</color>
-    <color name="aria_blue">#E85D04</color>
-    <color name="aria_blue_dark">#C2410C</color>
+    <!-- AllDown 5.0 — Dark Premium Clay (Claymorphism + Vibrant & Block-based). -->
+    <color name="aria_primary">#FF8A3D</color>
+    <color name="aria_primary_bright">#FF9E2C</color>
+    <color name="aria_primary_dark">#FFB37A</color>
+    <color name="aria_accent_blue">#4D7CFE</color>
+    <color name="aria_hero_end">#2A2140</color>
+    <color name="aria_bg">#121017</color>
+    <color name="aria_surface">#211D2B</color>
+    <color name="aria_surface2">#2A2438</color>
+    <color name="aria_clay_border">#3A3350</color>
+    <color name="aria_text">#F7F2EA</color>
+    <color name="aria_text_dim">#C9BBA6</color>
+    <color name="aria_on_pastel">#2E1A0A</color>
+    <color name="aria_green">#3ECF8E</color>
+    <color name="aria_red">#FF6B6B</color>
+    <color name="aria_orange">#FF8A3D</color>
+    <color name="aria_blue">#FF8A3D</color>
+    <color name="aria_blue_dark">#FFB37A</color>
     <color name="clay_peach">#FDBCB4</color>
     <color name="clay_blue">#ADD8E6</color>
     <color name="clay_mint">#B9F2D0</color>
-    <color name="clay_lilac">#E6E6FA</color>
+    <color name="clay_lilac">#CFC8FF</color>
     <color name="clay_lemon">#FFF0B8</color>
-    <color name="block_youtube">#FF0033</color>
+    <color name="block_youtube">#FF3355</color>
     <color name="block_spotify">#1DB954</color>
-    <color name="block_instagram">#E1306C</color>
-    <color name="block_pornhub">#111111</color>
+    <color name="block_instagram">#F43F8E</color>
+    <color name="block_pornhub">#000000</color>
     <color name="block_pornhub_text">#FF9000</color>
-    <color name="block_direct">#2563EB</color>
+    <color name="block_direct">#4D7CFE</color>
 </resources>

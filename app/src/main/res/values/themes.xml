@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Aria" parent="Theme.Material3.Light.NoActionBar">
+    <style name="Theme.Aria" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/aria_primary</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorOnPrimary">#1A120B</item>
         <item name="colorPrimaryContainer">@color/aria_surface2</item>
         <item name="colorOnPrimaryContainer">@color/aria_primary_dark</item>
         <item name="colorSecondary">@color/aria_accent_blue</item>
         <item name="colorSurface">@color/aria_surface</item>
-        <item name="android:statusBarColor">@color/aria_primary_bright</item>
+        <item name="android:statusBarColor">@color/aria_bg</item>
         <item name="android:navigationBarColor">@color/aria_surface</item>
         <item name="android:windowBackground">@color/aria_bg</item>
         <item name="android:windowLightStatusBar">false</item>

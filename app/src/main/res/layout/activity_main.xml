@@ -9,6 +9,18 @@
     android:orientation="vertical"
     tools:context=".ui.MainActivity">
 
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/homeScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
     <!-- Hero -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -175,7 +187,8 @@
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
-            android:elevation="4dp"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="8dp">
@@ -211,7 +224,8 @@
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
-            android:elevation="4dp"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="8dp">
@@ -247,7 +261,8 @@
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
-            android:elevation="4dp"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="8dp">
@@ -283,7 +298,8 @@
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
-            android:elevation="4dp"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="8dp">
@@ -318,7 +334,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:background="@drawable/bg_shortcut"
-            android:elevation="4dp"
+            android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="8dp">
@@ -359,7 +376,8 @@
         android:layout_marginTop="10dp"
         android:layout_marginEnd="12dp"
         android:background="@drawable/clay_card"
-        android:elevation="4dp"
+        android:elevation="6dp"
+            android:foreground="?attr/selectableItemBackground"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="12dp">
@@ -515,6 +533,7 @@
     </HorizontalScrollView>
 
     <TextView
+        android:id="@+id/queueTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
@@ -527,13 +546,13 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="wrap_content">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false"
             android:clipToPadding="false"
             android:paddingStart="10dp"
             android:paddingTop="8dp"
@@ -543,7 +562,7 @@
         <LinearLayout
             android:id="@+id/emptyState"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="300dp"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="32dp"
@@ -581,6 +600,9 @@
                 android:text="@string/add_downloads" />
         </LinearLayout>
     </FrameLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
     <LinearLayout
         android:id="@+id/selectionBar"
