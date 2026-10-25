@@ -384,4 +384,25 @@ class LinkIngestorTest {
         assertTrue(report.isEmpty)
         assertTrue(report.warnings.isNotEmpty())
     }
+
+    @Test
+    fun imageOnlyPostDownloadsTheImageItself() = runBlocking {
+        val url = "https://www.pinterest.com/pin/9/"
+        val engine = FakeEngine(
+            probes = mapOf(
+                url to ExtractorEngine.Probe(
+                    ok = true, title = "Photo pin", extractor = "Pinterest",
+                    formats = emptyList(),
+                    directFileUrl = "https://i.pinimg.com/originals/photo.jpg"
+                )
+            )
+        )
+        val report = LinkIngestor(engine).ingest(listOf(url), preset = "best")
+
+        val request = report.requests.single()
+        assertEquals(EngineKind.HTTP, request.engine)
+        assertEquals("https://i.pinimg.com/originals/photo.jpg", request.url)
+        assertEquals("Photo pin.jpg", request.fileName)
+        assertEquals("image/jpeg", request.mimeType)
+    }
 }

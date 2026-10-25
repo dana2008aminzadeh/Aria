@@ -72,7 +72,9 @@ class ExtractorEngine private constructor(
         val entries: List<PlaylistEntry> = emptyList(),
         val formats: List<FormatRow> = emptyList(),
         val bestHeight: Int = 0,
-        val hasAudioOnly: Boolean = false
+        val hasAudioOnly: Boolean = false,
+        /** Direct image file for image-only posts (Pinterest pins, Reddit/TikTok photos). */
+        val directFileUrl: String? = null
     )
 
     data class Plan(
@@ -206,12 +208,12 @@ class ExtractorEngine private constructor(
             val raw = module().callAttr("engine_info").toString()
             val json = JSONObject(raw)
             EngineInfo(
-                engine = json.optString("engine", "5.2.0"),
+                engine = json.optString("engine", "5.3.0"),
                 ytDlp = json.optString("yt_dlp", "?"),
                 python = json.optString("python", "?")
             )
         } catch (e: Throwable) {
-            EngineInfo("5.2.0", "unavailable", e.javaClass.simpleName)
+            EngineInfo("5.3.0", "unavailable", e.javaClass.simpleName)
         }
     }
 
@@ -280,7 +282,9 @@ class ExtractorEngine private constructor(
                 entries = entries,
                 formats = formats,
                 bestHeight = json.optInt("best_height", 0),
-                hasAudioOnly = json.optBoolean("has_audio_only")
+                hasAudioOnly = json.optBoolean("has_audio_only"),
+                directFileUrl = json.optString("direct_file_url")
+                    .takeIf { it.isNotBlank() && it != "null" }
             )
         } catch (e: Throwable) {
             Probe(false, friendly(e))

@@ -374,6 +374,40 @@ class ExtractionFlowTest(unittest.TestCase):
         self.assertEqual("webm", result["ext"])
         self.assertEqual("1440p • WebM", result["note"])
 
+    def test_short_share_link_is_resolved_before_extraction(self):
+        final = "https://www.pinterest.com/pin/123456789012345678/"
+        info = {"id": "1", "title": "Pin", "formats": []}
+        ydl = mock.Mock()
+        response = mock.Mock()
+        response.geturl.return_value = final
+        ydl.urlopen.return_value = response
+        ydl.extract_info.return_value = info
+
+        result = aria_dl._extract_info(ydl, "https://pin.it/abc123")
+
+        self.assertIs(info, result)
+        ydl.extract_info.assert_called_once_with(final, download=False)
+
+    def test_probe_exposes_direct_image_for_image_only_pin(self):
+        info = {
+            "id": "9", "title": "Photo pin", "extractor": "Pinterest", "formats": [],
+            "thumbnails": [
+                {"url": "https://i.pinimg.com/236x/photo.jpg", "width": 236, "height": 300},
+                {"url": "https://i.pinimg.com/originals/photo.jpg", "width": 1200, "height": 1500},
+            ],
+        }
+        with mock.patch.object(aria_dl, "_extract", return_value=info):
+            result = json.loads(aria_dl.probe("https://www.pinterest.com/pin/9/", "{}"))
+
+        self.assertTrue(result["ok"])
+        self.assertEqual("https://i.pinimg.com/originals/photo.jpg", result["direct_file_url"])
+
+    def test_reddit_share_link_needs_redirect_resolution(self):
+        self.assertTrue(aria_dl._needs_redirect_resolution(
+            "https://www.reddit.com/r/pics/s/AbCdEf"))
+        self.assertFalse(aria_dl._needs_redirect_resolution(
+            "https://www.reddit.com/r/pics/comments/abc123/title/"))
+
 
 if __name__ == "__main__":
     unittest.main()
