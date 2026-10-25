@@ -26,6 +26,11 @@ object MediaUrlNormalizer {
             host == "aparat.com" || host.endsWith(".aparat.com") -> normalizeAparat(uri, original)
             host == "instagram.com" || host.endsWith(".instagram.com") || host == "instagr.am" ->
                 normalizeInstagram(uri, original)
+            host == "redd.it" -> normalizeRedditShort(uri, original)
+            host == "reddit.com" || host.endsWith(".reddit.com") -> normalizeReddit(uri, original)
+            host.contains("pinterest.") -> normalizePinterest(uri, original)
+            host == "player.vimeo.com" -> normalizeVimeoPlayer(uri, original)
+            host == "m.twitch.tv" -> original.replace("://m.twitch.tv", "://www.twitch.tv")
             pornhubBase(host) != null -> normalizePornhub(uri, host, original)
             else -> original
         }
@@ -47,6 +52,38 @@ object MediaUrlNormalizer {
             return "https://www.instagram.com/$kind/$id/"
         }
         return original
+    }
+
+    /** redd.it/<postId> only matches yt-dlp's generic extractor; canonical comments URL hits RedditIE. */
+    private fun normalizeRedditShort(uri: URI, original: String): String {
+        val id = uri.rawPath.orEmpty().split('/').firstOrNull { it.isNotBlank() }
+            ?.takeIf { PORNHUB_ID.matches(it) } ?: return original
+        return "https://www.reddit.com/comments/$id/"
+    }
+
+    private fun normalizeReddit(uri: URI, original: String): String {
+        val parts = uri.rawPath.orEmpty().split('/').filter { it.isNotBlank() }
+        val idx = parts.indexOf("comments")
+        val id = parts.getOrNull(idx + 1)?.takeIf { idx >= 0 && PORNHUB_ID.matches(it) }
+            ?: return original
+        return "https://www.reddit.com/comments/$id/"
+    }
+
+    /** Any Pinterest TLD (pinterest.fr/.co.uk/...) with a /pin/<digits> path -> canonical .com pin. */
+    private fun normalizePinterest(uri: URI, original: String): String {
+        val parts = uri.rawPath.orEmpty().split('/').filter { it.isNotBlank() }
+        val idx = parts.indexOf("pin")
+        val id = parts.getOrNull(idx + 1)?.takeIf { idx >= 0 && it.all { c -> c.isDigit() } }
+            ?: return original
+        return "https://www.pinterest.com/pin/$id/"
+    }
+
+    private fun normalizeVimeoPlayer(uri: URI, original: String): String {
+        val parts = uri.rawPath.orEmpty().split('/').filter { it.isNotBlank() }
+        val id = parts.getOrNull(1)?.takeIf {
+            parts.firstOrNull() == "video" && it.all { c -> c.isDigit() }
+        } ?: return original
+        return "https://vimeo.com/$id"
     }
 
     private fun normalizeAparat(uri: URI, original: String): String {
