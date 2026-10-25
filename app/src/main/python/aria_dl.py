@@ -1,5 +1,5 @@
 """
-AllDown 5.3.0 - extraction engine.
+AllDown 5.4.0 - extraction engine.
 
 This file is shipped inside the APK and executed by Chaquopy (CPython 3.13 on Android).
 It is also run by the plain CPython interpreter in the test suite, so the code that is
@@ -22,7 +22,10 @@ import json
 import os
 import re
 import sys
+import threading
+import time
 import urllib.parse
+import urllib.request
 
 try:  # Android has no system CA bundle: yt-dlp/certifi provide one.
     import certifi
@@ -36,15 +39,48 @@ import yt_dlp  # noqa: E402  (must come after the SSL env vars)
 from yt_dlp.networking import Request  # noqa: E402
 from yt_dlp.networking._urllib import UrllibRH  # noqa: E402
 
-ENGINE_VERSION = "5.3.0"
+ENGINE_VERSION = "5.4.0"
 
 # Conservative defaults that improve throughput without creating dozens of connections.
 # HLS/DASH sites (including Aparat and Pornhub) benefit from parallel fragments; regular
 # HTTP media benefits from ranged chunks and a larger IO buffer. No rate limiter is set.
-DEFAULT_FRAGMENT_CONCURRENCY = 6
-MAX_FRAGMENT_CONCURRENCY = 8
+DEFAULT_FRAGMENT_CONCURRENCY = 8
+MAX_FRAGMENT_CONCURRENCY = 16
 HTTP_CHUNK_SIZE = 16 * 1024 * 1024
 IO_BUFFER_SIZE = 1024 * 1024
+
+# One extraction is shared by probe -> resolve -> download for a few minutes. Sites with
+# aggressive anti-bot checks (Pornhub above all) intermittently reject brand-new
+# sessions, so re-fetching the page for every phase made first attempts fail randomly.
+_INFO_CACHE = {}
+_INFO_CACHE_TTL = 600
+_INFO_CACHE_MAX = 32
+
+
+def _cache_get(url):
+    entry = _INFO_CACHE.get(url)
+    if not entry:
+        return None
+    stored_at, info = entry
+    if time.time() - stored_at > _INFO_CACHE_TTL:
+        _INFO_CACHE.pop(url, None)
+        return None
+    return info
+
+
+def _cache_put(url, info):
+    if not isinstance(info, dict) or info.get("_type") == "playlist":
+        return
+    _INFO_CACHE[url] = (time.time(), info)
+    while len(_INFO_CACHE) > _INFO_CACHE_MAX:
+        oldest = min(_INFO_CACHE, key=lambda key: _INFO_CACHE[key][0])
+        _INFO_CACHE.pop(oldest, None)
+
+
+def _cache_invalidate(url):
+    _INFO_CACHE.pop(url, None)
+
+
 MAX_PLAYLIST_ITEMS = 120
 
 
@@ -813,6 +849,10 @@ def _extract_info(ydl, url, download=False):
 
 
 def _extract(url, options, download=False, flat_playlist=False):
+    if not download:
+        cached = _cache_get(url)
+        if cached is not None:
+            return cached
     opts = _base_opts(options)
     probe_only = not download
     opts.update({
@@ -831,7 +871,10 @@ def _extract(url, options, download=False, flat_playlist=False):
         info = _extract_info(ydl, url, download=False)
         if info is None:
             raise RuntimeError("محتوایی پیدا نشد")
-        return ydl.sanitize_info(info)
+        info = ydl.sanitize_info(info)
+        if not download:
+            _cache_put(url, info)
+        return info
 
 
 def _first_entry(info):
@@ -921,6 +964,279 @@ def resolve(url, options_json="{}"):
         return json.dumps({"ok": False, "error": _human_error(exc)}, ensure_ascii=False)
 
 
+# --------------------------------------------------------------------------- parallel HTTP
+#
+# CDNs such as Pornhub's throttle a single connection hard (a few hundred KB/s),
+# while the same file over several ranged connections saturates the link. yt-dlp's
+# built-in HTTP downloader is single-connection, so progressive formats (direct
+# MP4/WebM/M4A files) are fetched here with parallel Range segments whenever the
+# server supports them. Anything unusual falls back to yt-dlp untouched.
+
+
+class _ParallelUnsupported(Exception):
+    pass
+
+
+def _parallel_candidate(info, format_id):
+    """Returns the format dict when it is a plain progressive HTTP file, else None."""
+    if not format_id:
+        return None
+    for fmt in info.get("formats") or []:
+        if str(fmt.get("format_id")) != str(format_id):
+            continue
+        url = fmt.get("url") or ""
+        protocol = str(fmt.get("protocol") or "").lower()
+        ext = str(fmt.get("ext") or "").lower()
+        if not url.startswith("http"):
+            return None
+        if protocol not in ("", "http", "https"):
+            return None
+        if ext in ("m3u8", "mpd") or "dash" in protocol or "m3u8" in protocol:
+            return None
+        return fmt
+    return None
+
+
+def _parallel_opener(proxy):
+    handlers = []
+    if isinstance(proxy, str) and proxy.strip():
+        handlers.append(urllib.request.ProxyHandler(
+            {"http": proxy.strip(), "https": proxy.strip()}))
+    try:
+        import ssl as _ssl
+        try:
+            import certifi as _certifi
+            context = _ssl.create_default_context(cafile=_certifi.where())
+        except Exception:
+            context = _ssl.create_default_context()
+        handlers.append(urllib.request.HTTPSHandler(context=context))
+    except Exception:
+        pass
+    return urllib.request.build_opener(*handlers)
+
+
+def _output_name(info, fmt):
+    title = str(info.get("title") or "download")
+    title = title.encode("utf-8", "ignore")[:120].decode("utf-8", "ignore")
+    name = "%s [%s][%s].%s" % (
+        title, info.get("id") or "media", fmt.get("format_id") or "fmt",
+        str(fmt.get("ext") or "mp4").lower())
+    return re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", name).strip() or "download.mp4"
+
+
+def _parallel_download(fmt, info, out_dir, connections, callback, proxy=None):
+    """Downloads one progressive format with parallel ranged segments.
+
+    Segment files (<dest>.segNN + <dest>.segs.json) survive a failed attempt, so a
+    retry resumes every segment instead of starting the file from zero.
+    Returns the finished file path.
+    """
+    url = fmt["url"]
+    headers = {}
+    for key, value in (fmt.get("http_headers") or {}).items():
+        if value:
+            headers[str(key)] = str(value)
+    headers.setdefault("User-Agent",
+                       "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36")
+    headers.setdefault("Accept", "*/*")
+    opener = _parallel_opener(proxy)
+    dest = os.path.join(out_dir, _output_name(info, fmt))
+
+    def open_range(start, end=None):
+        req_headers = dict(headers)
+        req_headers["Range"] = "bytes=%d-%s" % (start, "" if end is None else end)
+        return opener.open(urllib.request.Request(url, headers=req_headers), timeout=30)
+
+    # Probe: one byte tells us whether ranged parallel downloads are possible.
+    try:
+        probe_resp = open_range(0, 0)
+    except Exception as exc:
+        raise RuntimeError(str(exc)) from exc
+    status = getattr(probe_resp, "status", None) or probe_resp.getcode()
+    if status == 200:
+        # Range ignored: stream this very response as a single-connection download.
+        total = int(probe_resp.headers.get("Content-Length") or 0)
+        done = 0
+        started = time.time()
+        with open(dest, "wb") as fh:
+            while True:
+                if _cancelled(callback):
+                    probe_resp.close()
+                    raise _Cancelled()
+                chunk = probe_resp.read(256 * 1024)
+                if not chunk:
+                    break
+                fh.write(chunk)
+                done += len(chunk)
+                _event(callback, {
+                    "type": "progress", "downloaded": done, "total": total,
+                    "speed": int(done / max(1.0, time.time() - started)),
+                    "eta": 0, "percent": round(done * 100.0 / total, 1) if total else -1,
+                    "filename": os.path.basename(dest)})
+        probe_resp.close()
+        return dest
+    if status != 206:
+        probe_resp.close()
+        raise RuntimeError("HTTP %s" % status)
+    content_range = probe_resp.headers.get("Content-Range") or ""
+    probe_resp.close()
+    match = re.search(r"/(\d+)\s*$", content_range)
+    total = int(match.group(1)) if match else 0
+    if total <= 0:
+        raise _ParallelUnsupported("unknown total size")
+
+    if os.path.exists(dest) and os.path.getsize(dest) == total:
+        return dest
+
+    connections = max(1, min(16, int(connections or 8)))
+    seg_count = max(1, min(connections, total // (1024 * 1024)))
+    base, remainder = divmod(total, seg_count)
+    ranges = []
+    cursor = 0
+    for index in range(seg_count):
+        size = base + (1 if index < remainder else 0)
+        ranges.append((cursor, cursor + size - 1))
+        cursor += size
+
+    meta_path = dest + ".segs.json"
+    seg_paths = ["%s.seg%02d" % (dest, i) for i in range(seg_count)]
+    progress = [0] * seg_count
+    for i, (seg_start, seg_end) in enumerate(ranges):
+        if os.path.exists(seg_paths[i]):
+            progress[i] = min(os.path.getsize(seg_paths[i]), seg_end - seg_start + 1)
+    try:
+        with open(meta_path, "w", encoding="utf-8") as fh:
+            json.dump({"total": total, "ranges": ranges}, fh)
+    except Exception:
+        pass
+
+    stop = threading.Event()
+    failures = []
+
+    def worker(index):
+        seg_start, seg_end = ranges[index]
+        seg_len = seg_end - seg_start + 1
+        path = seg_paths[index]
+        tries = 0
+        while not stop.is_set():
+            have = os.path.getsize(path) if os.path.exists(path) else 0
+            if have > seg_len:
+                os.remove(path)
+                have = 0
+            progress[index] = have
+            if have >= seg_len:
+                return
+            try:
+                resp = open_range(seg_start + have, seg_end)
+                code = getattr(resp, "status", None) or resp.getcode()
+                if code != 206:
+                    resp.close()
+                    raise _ParallelUnsupported("segment without range support")
+                with open(path, "ab") as fh:
+                    while not stop.is_set():
+                        chunk = resp.read(256 * 1024)
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        progress[index] += len(chunk)
+                resp.close()
+                if progress[index] >= seg_len:
+                    return
+                raise IOError("connection closed early")
+            except _ParallelUnsupported:
+                failures.append("unsupported")
+                stop.set()
+                return
+            except Exception as exc:  # noqa: BLE001
+                tries += 1
+                if tries > 4:
+                    failures.append(str(exc))
+                    stop.set()
+                    return
+                stop.wait(1.5)
+
+    threads = [threading.Thread(target=worker, args=(i,), daemon=True)
+               for i in range(seg_count)]
+    for thread in threads:
+        thread.start()
+    started = time.time()
+    last_done, last_time = sum(progress), started
+    while any(thread.is_alive() for thread in threads):
+        if _cancelled(callback):
+            stop.set()
+            for thread in threads:
+                thread.join(timeout=5)
+            raise _Cancelled()
+        time.sleep(0.4)
+        done = sum(progress)
+        now = time.time()
+        speed = int((done - last_done) / max(0.1, now - last_time))
+        last_done, last_time = done, now
+        _event(callback, {
+            "type": "progress", "downloaded": done, "total": total,
+            "speed": speed,
+            "eta": int((total - done) / speed) if speed else 0,
+            "percent": round(done * 100.0 / total, 1),
+            "filename": os.path.basename(dest)})
+    for thread in threads:
+        thread.join(timeout=5)
+    if _cancelled(callback):
+        raise _Cancelled()
+    if failures:
+        if failures[0] == "unsupported":
+            raise _ParallelUnsupported("segmented download unsupported")
+        raise RuntimeError(failures[0])
+    if sum(progress) < total:
+        raise RuntimeError("connection closed early")
+
+    with open(dest, "wb") as out:
+        for path in seg_paths:
+            with open(path, "rb") as fh:
+                while True:
+                    chunk = fh.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+    if os.path.getsize(dest) != total:
+        raise RuntimeError("assembled file size mismatch")
+    for path in seg_paths:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    try:
+        os.remove(meta_path)
+    except OSError:
+        pass
+    _event(callback, {
+        "type": "progress", "downloaded": total, "total": total,
+        "speed": 0, "eta": 0, "percent": 100.0,
+        "filename": os.path.basename(dest)})
+    return dest
+
+
+_NON_TRANSIENT_TOKENS = (
+    "drm", "geo restricted", "geoblocked", "private video", "login required",
+    "sign in to confirm", "age-restricted", "age restricted", "not available in your",
+)
+
+
+def _is_transient_error(exc):
+    """Most first-attempt media failures are anti-bot/network flakes worth one more go."""
+    low = str(exc).lower()
+    if any(token in low for token in _NON_TRANSIENT_TOKENS):
+        return False
+    return True
+
+
+def _sleep_cancellable(seconds, callback):
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if _cancelled(callback):
+            raise _Cancelled()
+        time.sleep(0.25)
+
+
 # --------------------------------------------------------------------------- download
 
 
@@ -963,9 +1279,130 @@ class _Logger:
         _event(self.callback, {"type": "log", "message": _sanitize(msg, 300)})
 
 
+def _download_once(request, callback):
+    """One download attempt; raises on failure so download() can retry transient ones."""
+    url = request.get("url")
+    out_dir = request.get("out_dir") or "."
+    preset = request.get("preset") or "best"
+    format_id = request.get("format_id")
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Fast path: a progressive file (Pornhub MP4, YouTube MP4/WebM, ...) is fetched
+    # with parallel ranged segments straight from the already-extracted info, so no
+    # extra webpage fetch is needed and single-connection CDN throttling is avoided.
+    if format_id:
+        fmt = None
+        info = None
+        try:
+            info = _first_entry(_extract(url, request, download=False))
+            fmt = _parallel_candidate(info, format_id)
+        except Exception:
+            fmt = None
+        if fmt is not None:
+            try:
+                connections = 8
+                try:
+                    connections = int(request.get("fragment_concurrency") or 8)
+                except (TypeError, ValueError):
+                    pass
+                path = _parallel_download(
+                    fmt, info, out_dir, connections, callback, request.get("proxy"))
+                result = {
+                    "ok": True,
+                    "title": _sanitize(info.get("title") or "download"),
+                    "files": [{"path": path, "size": os.path.getsize(path)}],
+                    "duration": info.get("duration"),
+                    "thumbnail": info.get("thumbnail"),
+                    "uploader": _sanitize(info.get("uploader") or info.get("channel") or ""),
+                    "extractor": info.get("extractor_key") or info.get("extractor") or "",
+                }
+                _event(callback, {"type": "done", "files": result["files"],
+                                  "title": result["title"]})
+                return result
+            except _Cancelled:
+                raise
+            except Exception:
+                # Parallel fetching is an optimisation, never a single point of
+                # failure: yt-dlp below re-extracts fresh and downloads its own way.
+                pass
+
+    opts = _base_opts(request)
+    opts.update({
+        # format_id in the template keeps the video and audio renditions of one video
+        # in separate files even when both end up with the same extension.
+        "outtmpl": os.path.join(out_dir, "%(title).120B [%(id)s][%(format_id)s].%(ext)s"),
+        "noplaylist": True,
+        "continuedl": True,
+        "overwrites": False,
+        "logger": _Logger(callback),
+        "noprogress": True,
+    })
+    if format_id:
+        opts["format"] = str(format_id)
+    elif preset in ("audio", "music", "mp3"):
+        opts["format"] = "ba[ext=m4a]/ba[ext=mp4]/ba/b"
+    else:
+        opts["format"] = "b"
+
+    def hook(d):
+        if _cancelled(callback):
+            raise _Cancelled()
+        status = d.get("status")
+        if status == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            done = d.get("downloaded_bytes") or 0
+            speed = d.get("speed") or 0
+            eta = d.get("eta") or 0
+            _event(callback, {
+                "type": "progress",
+                "downloaded": int(done),
+                "total": int(total),
+                "speed": int(speed) if speed else 0,
+                "eta": int(eta) if eta else 0,
+                "percent": round(done * 100.0 / total, 1) if total else -1,
+                "filename": _sanitize(d.get("filename") or "", 200),
+            })
+
+    opts["progress_hooks"] = [hook]
+
+    with _AriaYoutubeDL(opts) as ydl:
+        info = _extract_info(ydl, url, download=True)
+        if info is None:
+            raise RuntimeError("دانلود ناموفق بود")
+        info = _first_entry(ydl.sanitize_info(info))
+
+    files = []
+    for rd in info.get("requested_downloads") or []:
+        path = rd.get("filepath") or rd.get("_filename")
+        if path and os.path.exists(path):
+            files.append(path)
+    if not files:
+        path = info.get("filepath") or info.get("_filename")
+        if path and os.path.exists(path):
+            files.append(path)
+    if not files:
+        raise RuntimeError("فایل خروجی پیدا نشد")
+
+    result = {
+        "ok": True,
+        "title": _sanitize(info.get("title") or "download"),
+        "files": [{"path": pth, "size": os.path.getsize(pth)} for pth in files],
+        "duration": info.get("duration"),
+        "thumbnail": info.get("thumbnail"),
+        "uploader": _sanitize(info.get("uploader") or info.get("channel") or ""),
+        "extractor": info.get("extractor_key") or info.get("extractor") or "",
+    }
+    _event(callback, {"type": "done", "files": result["files"], "title": result["title"]})
+    return result
+
+
 def download(request_json, callback=None):
     """
     Downloads exactly one rendition (or a whole single-video url when format_id is null).
+
+    Transient failures (anti-bot 403s, dropped connections, expired signed URLs) are
+    retried automatically with a fresh extraction: the first attempt hitting a site's
+    bot check no longer means the user has to press retry by hand.
 
     Events pushed to callback.on_event(json):
         {"type":"start","title":...,"total":...}
@@ -977,94 +1414,41 @@ def download(request_json, callback=None):
     """
     try:
         request = json.loads(request_json)
-        url = request.get("url")
-        out_dir = request.get("out_dir") or "."
-        preset = request.get("preset") or "best"
-        format_id = request.get("format_id")
-        os.makedirs(out_dir, exist_ok=True)
-
-        opts = _base_opts(request)
-        opts.update({
-            # format_id in the template keeps the video and audio renditions of one video
-            # in separate files even when both end up with the same extension.
-            "outtmpl": os.path.join(out_dir, "%(title).120B [%(id)s][%(format_id)s].%(ext)s"),
-            "noplaylist": True,
-            "continuedl": True,
-            "overwrites": False,
-            "logger": _Logger(callback),
-            "noprogress": True,
-        })
-        if format_id:
-            opts["format"] = str(format_id)
-        elif preset in ("audio", "music", "mp3"):
-            opts["format"] = "ba[ext=m4a]/ba[ext=mp4]/ba/b"
-        else:
-            opts["format"] = "b"
-
-        def hook(d):
-            if _cancelled(callback):
-                raise _Cancelled()
-            status = d.get("status")
-            if status == "downloading":
-                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-                done = d.get("downloaded_bytes") or 0
-                speed = d.get("speed") or 0
-                eta = d.get("eta") or 0
-                _event(callback, {
-                    "type": "progress",
-                    "downloaded": int(done),
-                    "total": int(total),
-                    "speed": int(speed) if speed else 0,
-                    "eta": int(eta) if eta else 0,
-                    "percent": round(done * 100.0 / total, 1) if total else -1,
-                    "filename": _sanitize(d.get("filename") or "", 200),
-                })
-
-        opts["progress_hooks"] = [hook]
-
-        with _AriaYoutubeDL(opts) as ydl:
-            info = _extract_info(ydl, url, download=True)
-            if info is None:
-                raise RuntimeError("دانلود ناموفق بود")
-            info = _first_entry(ydl.sanitize_info(info))
-
-        files = []
-        for rd in info.get("requested_downloads") or []:
-            path = rd.get("filepath") or rd.get("_filename")
-            if path and os.path.exists(path):
-                files.append(path)
-        if not files:
-            path = info.get("filepath") or info.get("_filename")
-            if path and os.path.exists(path):
-                files.append(path)
-        if not files:
-            raise RuntimeError("فایل خروجی پیدا نشد")
-
-        result = {
-            "ok": True,
-            "title": _sanitize(info.get("title") or "download"),
-            "files": [{"path": p, "size": os.path.getsize(p)} for p in files],
-            "duration": info.get("duration"),
-            "thumbnail": info.get("thumbnail"),
-            "uploader": _sanitize(info.get("uploader") or info.get("channel") or ""),
-            "extractor": info.get("extractor_key") or info.get("extractor") or "",
-        }
-        _event(callback, {"type": "done", "files": result["files"], "title": result["title"]})
-        return json.dumps(result, ensure_ascii=False)
-
-    except _Cancelled:
-        _event(callback, {"type": "cancelled"})
-        return json.dumps({"ok": False, "cancelled": True, "error": "دانلود متوقف شد"},
-                          ensure_ascii=False)
     except Exception as exc:  # noqa: BLE001
-        if exc.__class__.__name__ == "DownloadCancelled":
+        return json.dumps({"ok": False, "error": _human_error(exc)}, ensure_ascii=False)
+    url = request.get("url")
+    last_exc = None
+    for attempt in range(3):
+        try:
+            result = _download_once(request, callback)
+            return json.dumps(result, ensure_ascii=False)
+        except _Cancelled:
             _event(callback, {"type": "cancelled"})
             return json.dumps({"ok": False, "cancelled": True, "error": "دانلود متوقف شد"},
                               ensure_ascii=False)
-        message = _human_error(exc)
-        _event(callback, {"type": "error", "message": message})
-        return json.dumps({"ok": False, "error": message, "detail": _sanitize(exc, 400)},
-                          ensure_ascii=False)
+        except Exception as exc:  # noqa: BLE001
+            if exc.__class__.__name__ == "DownloadCancelled":
+                _event(callback, {"type": "cancelled"})
+                return json.dumps({"ok": False, "cancelled": True, "error": "دانلود متوقف شد"},
+                                  ensure_ascii=False)
+            last_exc = exc
+            if attempt >= 2 or not _is_transient_error(exc):
+                break
+            # Signed URLs / sessions from the failed attempt may be the problem:
+            # drop the cached extraction so the retry re-fetches everything fresh.
+            _cache_invalidate(url)
+            _event(callback, {"type": "log", "message":
+                              "تلاش %d ناموفق بود؛ تلاش خودکار دوباره…" % (attempt + 1)})
+            try:
+                _sleep_cancellable(2.0 * (attempt + 1), callback)
+            except _Cancelled:
+                _event(callback, {"type": "cancelled"})
+                return json.dumps({"ok": False, "cancelled": True,
+                                   "error": "دانلود متوقف شد"}, ensure_ascii=False)
+    message = _human_error(last_exc)
+    _event(callback, {"type": "error", "message": message})
+    return json.dumps({"ok": False, "error": message,
+                       "detail": _sanitize(last_exc, 400)}, ensure_ascii=False)
 
 
 # --------------------------------------------------------------------------- misc

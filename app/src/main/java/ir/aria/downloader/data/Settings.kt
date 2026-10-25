@@ -21,8 +21,8 @@ class Settings(context: Context) {
         const val KEY_PROXY_URL = "proxy_url"
         const val DEFAULT_CONCURRENCY = 3
         const val MAX_CONCURRENCY = 10
-        const val DEFAULT_FRAGMENT_CONCURRENCY = 6
-        const val MAX_FRAGMENT_CONCURRENCY = 8
+        const val DEFAULT_FRAGMENT_CONCURRENCY = 8
+        const val MAX_FRAGMENT_CONCURRENCY = 16
     }
 
     var concurrency: Int

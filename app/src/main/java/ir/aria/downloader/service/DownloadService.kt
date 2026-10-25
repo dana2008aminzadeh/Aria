@@ -357,7 +357,11 @@ class DownloadService : Service() {
         val plan = engine.resolve(startItem.url, startItem.preset, selection)
         if (!plan.ok) {
             Log.e("AriaService", "resolve failed: " + plan.error)
-            failItem(id, plan.error ?: getString(R.string.download_failed))
+            val message = plan.error ?: getString(R.string.download_failed)
+            // Extraction is the flakiest phase on anti-bot sites (Pornhub!): a failed
+            // resolve gets the same automatic retry as a failed download instead of
+            // dying instantly and forcing the user to tap retry by hand.
+            if (!scheduleRetry(id, startItem, message)) failItem(id, message)
             return
         }
         Log.d("AriaService", "plan mode=" + plan.mode + " v=" + plan.videoId + " a=" + plan.audioId + " f=" + plan.formatId)

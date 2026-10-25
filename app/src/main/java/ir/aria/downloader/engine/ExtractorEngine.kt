@@ -208,12 +208,12 @@ class ExtractorEngine private constructor(
             val raw = module().callAttr("engine_info").toString()
             val json = JSONObject(raw)
             EngineInfo(
-                engine = json.optString("engine", "5.3.0"),
+                engine = json.optString("engine", "5.4.0"),
                 ytDlp = json.optString("yt_dlp", "?"),
                 python = json.optString("python", "?")
             )
         } catch (e: Throwable) {
-            EngineInfo("5.3.0", "unavailable", e.javaClass.simpleName)
+            EngineInfo("5.4.0", "unavailable", e.javaClass.simpleName)
         }
     }
 

@@ -20,8 +20,8 @@ android {
         applicationId "ir.aria.downloader"
         minSdk 24
         targetSdk 33
-        versionCode 14
-        versionName "5.3.0"
+        versionCode 15
+        versionName "5.4.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
